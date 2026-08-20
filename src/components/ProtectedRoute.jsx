@@ -1,6 +1,6 @@
 import React from 'react';
 import { Navigate, Outlet } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
+import { useAuth } from '../context/auth';
 
 const ProtectedRoute = ({ allowedRoles }) => {
   const { currentUser, userProfile, loading } = useAuth();
@@ -8,25 +8,27 @@ const ProtectedRoute = ({ allowedRoles }) => {
   if (loading) {
     return (
       <div style={{
-        minHeight: '100vh', 
-        display: 'flex', 
-        alignItems: 'center', 
+        minHeight: '100vh',
+        display: 'flex',
+        alignItems: 'center',
         justifyContent: 'center',
         background: '#0b0f19',
         color: '#f97316'
       }}>
-        <h2>Cargando sistema ApexGym...</h2>
+        <h2>Cargando sistema AnimApp...</h2>
       </div>
     );
   }
 
-  // Redirigir a login si no hay usuario autenticado
   if (!currentUser) {
     return <Navigate to="/login" replace />;
   }
 
-  // Verificar si el rol del usuario está permitido
-  if (allowedRoles && userProfile && !allowedRoles.includes(userProfile.rol)) {
+  if (!userProfile?.perfilCompleto || !userProfile?.activo) {
+    return <Navigate to="/unauthorized" replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(userProfile.rol)) {
     return <Navigate to="/unauthorized" replace />;
   }
 

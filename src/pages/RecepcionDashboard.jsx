@@ -1,329 +1,596 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { 
-  UserCheck, 
-  Users, 
-  UserPlus, 
-  Trash2, 
-  Edit3, 
-  LogOut, 
-  Search, 
-  Filter,
-  CheckCircle,
+import {
+  ArrowDownCircle,
+  ArrowUpCircle,
+  Edit3,
+  History,
   Home,
+  LogOut,
+  Package,
+  Search,
+  Trash2,
+  UserCheck,
+  UserPlus,
+  Users,
   X
 } from 'lucide-react';
+import SedeSwitcher from '../components/SedeSwitcher';
+import { getSedeLabel } from '../constants/appData';
+import { useAuth } from '../context/auth';
+
+const initialAlumnos = [
+  { id: '1', nombre: 'Gonzalo Perez', dni: '39444111', email: 'gonzalo@gmail.com', telefono: '+54 9 11 5555-1111', sede: 'moreno', profesorAsignado: 'Carlos Rodriguez', estado: 'Activo' },
+  { id: '2', nombre: 'Camila Torres', dni: '41222999', email: 'camila@gmail.com', telefono: '+54 9 11 5555-2222', sede: 'edison', profesorAsignado: 'Sin asignar', estado: 'Activo' },
+  { id: '3', nombre: 'Roberto Sanchez', dni: '38111222', email: 'roberto@gmail.com', telefono: '+54 9 11 5555-3333', sede: 'general-san-martin', profesorAsignado: 'Esteban Benitez', estado: 'Activo' }
+];
+
+const initialStock = [
+  { id: 'p1', nombre: 'Lavandina', categoria: 'Limpieza', unidad: 'litros', sede: 'moreno', stockActual: 12, stockMinimo: 5 },
+  { id: 'p2', nombre: 'Rollo de papel', categoria: 'Banos', unidad: 'unidades', sede: 'moreno', stockActual: 18, stockMinimo: 10 },
+  { id: 'p3', nombre: 'Desinfectante', categoria: 'Limpieza', unidad: 'litros', sede: 'edison', stockActual: 4, stockMinimo: 6 },
+  { id: 'p4', nombre: 'Bolsas de residuos', categoria: 'Deposito', unidad: 'paquetes', sede: 'general-san-martin', stockActual: 9, stockMinimo: 4 }
+];
+
+const initialMovimientos = [
+  { id: 'm1', productoId: 'p1', productoNombre: 'Lavandina', sede: 'moreno', tipo: 'ingreso', cantidad: 6, usuario: 'Mariana Lopez', motivo: 'Compra semanal', fecha: '2026-08-16' },
+  { id: 'm2', productoId: 'p3', productoNombre: 'Desinfectante', sede: 'edison', tipo: 'egreso', cantidad: 2, usuario: 'Lucia Fernandez', motivo: 'Reposicion vestuarios', fecha: '2026-08-17' }
+];
+
+const emptyAlumnoForm = {
+  nombre: '',
+  dni: '',
+  email: '',
+  telefono: '',
+  profesorAsignado: 'Sin asignar'
+};
+
+const emptyProductForm = {
+  nombre: '',
+  categoria: 'Limpieza',
+  unidad: 'unidades',
+  stockActual: 0,
+  stockMinimo: 0
+};
+
+const emptyMovementForm = {
+  tipo: 'ingreso',
+  cantidad: 1,
+  motivo: ''
+};
 
 const RecepcionDashboard = () => {
-  const { userProfile, logout } = useAuth();
+  const { activeSede, logout, userProfile } = useAuth();
   const navigate = useNavigate();
 
-  const [sedeSeleccionada, setSedeSeleccionada] = useState('sede_norte');
+  const [activeSection, setActiveSection] = useState('alumnos');
   const [searchTerm, setSearchTerm] = useState('');
-  const [showModal, setShowModal] = useState(false);
+  const [alumnos, setAlumnos] = useState(initialAlumnos);
+  const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [studentForm, setStudentForm] = useState(emptyAlumnoForm);
 
-  // Lista de alumnos registrados en recepción
-  const [alumnosList, setAlumnosList] = useState([
-    { id: '1', nombre: 'Gonzalo Pérez', dni: '39444111', email: 'gonzalo@gmail.com', telefono: '+54 9 11 5555-1111', sede: 'sede_norte', profesorAsignado: 'Carlos Rodríguez', estado: 'Activo' },
-    { id: '2', nombre: 'Camila Torres', dni: '41222999', email: 'camila@gmail.com', telefono: '+54 9 11 5555-2222', sede: 'sede_centro', profesorAsignado: 'Sin Asignar', estado: 'Activo' },
-    { id: '3', nombre: 'Roberto Sánchez', dni: '38111222', email: 'roberto@gmail.com', telefono: '+54 9 11 5555-3333', sede: 'sede_sur', profesorAsignado: 'Esteban Benítez', estado: 'Activo' }
-  ]);
+  const [stockItems, setStockItems] = useState(initialStock);
+  const [movimientos, setMovimientos] = useState(initialMovimientos);
+  const [showProductModal, setShowProductModal] = useState(false);
+  const [editingProduct, setEditingProduct] = useState(null);
+  const [productForm, setProductForm] = useState(emptyProductForm);
+  const [showMovementModal, setShowMovementModal] = useState(false);
+  const [selectedProduct, setSelectedProduct] = useState(null);
+  const [movementForm, setMovementForm] = useState(emptyMovementForm);
 
-  const [formAlumno, setFormAlumno] = useState({
-    nombre: '',
-    dni: '',
-    email: '',
-    telefono: '',
-    sede: 'sede_norte',
-    profesorAsignado: 'Carlos Rodríguez'
-  });
+  const activeSedeId = activeSede?.id;
 
-  const handleOpenAddModal = () => {
-    setEditingStudent(null);
-    setFormAlumno({
-      nombre: '',
-      dni: '',
-      email: '',
-      telefono: '',
-      sede: sedeSeleccionada,
-      profesorAsignado: 'Carlos Rodríguez'
+  const filteredAlumnos = useMemo(() => {
+    return alumnos.filter((alumno) => {
+      const query = searchTerm.toLowerCase().trim();
+      const matchesSearch = !query
+        || alumno.nombre.toLowerCase().includes(query)
+        || alumno.dni.includes(query);
+      const matchesSede = !activeSedeId || alumno.sede === activeSedeId;
+      return matchesSearch && matchesSede;
     });
-    setShowModal(true);
-  };
+  }, [activeSedeId, alumnos, searchTerm]);
 
-  const handleOpenEditModal = (student) => {
+  const stockBySede = useMemo(() => {
+    return stockItems.filter((item) => item.sede === activeSedeId);
+  }, [activeSedeId, stockItems]);
+
+  const movimientosBySede = useMemo(() => {
+    return movimientos.filter((movimiento) => movimiento.sede === activeSedeId);
+  }, [activeSedeId, movimientos]);
+
+  const stockBajoCount = stockBySede.filter((item) => item.stockActual <= item.stockMinimo).length;
+
+  const handleOpenStudentModal = (student = null) => {
     setEditingStudent(student);
-    setFormAlumno({
+    setStudentForm(student ? {
       nombre: student.nombre,
       dni: student.dni,
       email: student.email,
       telefono: student.telefono,
-      sede: student.sede,
       profesorAsignado: student.profesorAsignado
-    });
-    setShowModal(true);
+    } : emptyAlumnoForm);
+    setShowStudentModal(true);
   };
 
-  const handleSaveStudent = (e) => {
-    e.preventDefault();
+  const handleSaveStudent = (event) => {
+    event.preventDefault();
 
     if (editingStudent) {
-      // Modificar existente
-      setAlumnosList(alumnosList.map(item => item.id === editingStudent.id ? { ...item, ...formAlumno } : item));
+      setAlumnos((current) => current.map((alumno) => (
+        alumno.id === editingStudent.id ? { ...alumno, ...studentForm } : alumno
+      )));
     } else {
-      // Alta de nuevo alumno
-      const created = {
-        id: Date.now().toString(),
-        ...formAlumno,
-        estado: 'Activo'
-      };
-      setAlumnosList([...alumnosList, created]);
+      setAlumnos((current) => [
+        ...current,
+        {
+          id: Date.now().toString(),
+          ...studentForm,
+          sede: activeSedeId,
+          estado: 'Activo'
+        }
+      ]);
     }
 
-    setShowModal(false);
+    setShowStudentModal(false);
+    setEditingStudent(null);
   };
 
   const handleDeleteStudent = (id) => {
-    if (window.confirm('¿Está seguro de eliminar a este alumno del sistema de la sede?')) {
-      setAlumnosList(alumnosList.filter(item => item.id !== id));
+    if (window.confirm('Esta seguro de eliminar a este alumno?')) {
+      setAlumnos((current) => current.filter((alumno) => alumno.id !== id));
     }
   };
 
-  const filteredAlumnos = alumnosList.filter(item => {
-    const matchesSearch = item.nombre.toLowerCase().includes(searchTerm.toLowerCase()) || 
-                          item.dni.includes(searchTerm);
-    const matchesSede = sedeSeleccionada === 'todas' || item.sede === sedeSeleccionada;
-    return matchesSearch && matchesSede;
-  });
+  const handleOpenProductModal = (product = null) => {
+    setEditingProduct(product);
+    setProductForm(product ? {
+      nombre: product.nombre,
+      categoria: product.categoria,
+      unidad: product.unidad,
+      stockActual: product.stockActual,
+      stockMinimo: product.stockMinimo
+    } : emptyProductForm);
+    setShowProductModal(true);
+  };
+
+  const handleSaveProduct = (event) => {
+    event.preventDefault();
+    const normalizedProduct = {
+      ...productForm,
+      stockActual: Number(productForm.stockActual),
+      stockMinimo: Number(productForm.stockMinimo)
+    };
+
+    if (editingProduct) {
+      setStockItems((current) => current.map((item) => (
+        item.id === editingProduct.id ? { ...item, ...normalizedProduct } : item
+      )));
+    } else {
+      setStockItems((current) => [
+        ...current,
+        {
+          id: Date.now().toString(),
+          ...normalizedProduct,
+          sede: activeSedeId
+        }
+      ]);
+    }
+
+    setShowProductModal(false);
+    setEditingProduct(null);
+  };
+
+  const handleOpenMovementModal = (product, tipo) => {
+    setSelectedProduct(product);
+    setMovementForm({ ...emptyMovementForm, tipo });
+    setShowMovementModal(true);
+  };
+
+  const handleSaveMovement = (event) => {
+    event.preventDefault();
+    if (!selectedProduct) return;
+
+    const cantidad = Number(movementForm.cantidad);
+    if (movementForm.tipo === 'egreso' && cantidad > selectedProduct.stockActual) {
+      window.alert('No hay stock suficiente para registrar este egreso.');
+      return;
+    }
+
+    const nextStock = movementForm.tipo === 'ingreso'
+      ? selectedProduct.stockActual + cantidad
+      : selectedProduct.stockActual - cantidad;
+
+    setStockItems((current) => current.map((item) => (
+      item.id === selectedProduct.id ? { ...item, stockActual: nextStock } : item
+    )));
+
+    setMovimientos((current) => [
+      {
+        id: Date.now().toString(),
+        productoId: selectedProduct.id,
+        productoNombre: selectedProduct.nombre,
+        sede: selectedProduct.sede,
+        tipo: movementForm.tipo,
+        cantidad,
+        usuario: userProfile?.nombre || userProfile?.email || 'Usuario',
+        motivo: movementForm.motivo || 'Sin detalle',
+        fecha: new Date().toISOString().split('T')[0]
+      },
+      ...current
+    ]);
+
+    setShowMovementModal(false);
+    setSelectedProduct(null);
+  };
+
+  const handleDeleteProduct = (id) => {
+    if (window.confirm('Esta seguro de eliminar este producto del stock?')) {
+      setStockItems((current) => current.filter((item) => item.id !== id));
+    }
+  };
 
   return (
     <div className="dashboard-layout">
-      {/* Sidebar */}
       <aside className="sidebar">
         <div>
           <div className="logo" style={{ marginBottom: '2rem' }}>
             <div className="logo-icon" style={{ background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }}>
               <UserCheck size={20} />
             </div>
-            <span>PANEL<span style={{ color: 'var(--accent-cyan)' }}>RECEPCIÓN</span></span>
+            <span>PANEL<span style={{ color: 'var(--accent-cyan)' }}>RECEPCION</span></span>
           </div>
 
           <ul className="sidebar-menu">
-            <li className="sidebar-item active">
-              <Users size={18} /> Alumnos de la Sede
+            <li className={`sidebar-item ${activeSection === 'alumnos' ? 'active' : ''}`} onClick={() => setActiveSection('alumnos')}>
+              <Users size={18} /> Alumnos
+            </li>
+            <li className={`sidebar-item ${activeSection === 'stock' ? 'active' : ''}`} onClick={() => setActiveSection('stock')}>
+              <Package size={18} /> Stock limpieza
             </li>
             <li className="sidebar-item" onClick={() => navigate('/')}>
-              <Home size={18} /> Sitio Informativo
+              <Home size={18} /> Sitio informativo
             </li>
           </ul>
         </div>
 
         <button onClick={logout} className="sidebar-item" style={{ color: '#ef4444' }}>
-          <LogOut size={18} /> Cerrar Sesión
+          <LogOut size={18} /> Cerrar sesion
         </button>
       </aside>
 
-      {/* Main Content */}
       <main className="main-content">
         <div className="header-bar">
           <div>
-            <h1 style={{ fontSize: '1.8rem' }}>Gestión de Inscripciones y Alumnos</h1>
+            <h1 style={{ fontSize: '1.8rem' }}>{activeSection === 'alumnos' ? 'Gestion de alumnos' : 'Stock de limpieza'}</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-              Alta de alumnos, edición de datos personales y asignación de profesores
+              Trabajo actual en {activeSede?.titulo || 'sede asignada'}.
             </p>
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem' }}>
-            <span className="badge-role badge-recepcion">Rol: Recepcionista</span>
-            <button className="btn-primary" style={{ background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }} onClick={handleOpenAddModal}>
-              <UserPlus size={18} /> Inscribir Nuevo Alumno
-            </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '1rem', flexWrap: 'wrap' }}>
+            <SedeSwitcher />
+            <span className="badge-role badge-recepcion">Rol: Recepcion</span>
+            {activeSection === 'alumnos' ? (
+              <button className="btn-primary" style={{ background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }} onClick={() => handleOpenStudentModal()}>
+                <UserPlus size={18} /> Nuevo alumno
+              </button>
+            ) : (
+              <button className="btn-primary" style={{ background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }} onClick={() => handleOpenProductModal()}>
+                <Package size={18} /> Nuevo producto
+              </button>
+            )}
           </div>
         </div>
 
-        {/* Filtros */}
-        <div style={{ display: 'flex', gap: '1rem', flexWrap: 'wrap', marginBottom: '1.5rem' }}>
-          <div style={{ flex: 1, minWidth: '250px', position: 'relative' }}>
-            <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
-            <input 
-              type="text" 
-              className="form-input" 
-              placeholder="Buscar por nombre o DNI..." 
-              style={{ paddingLeft: '2.5rem' }}
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-            />
-          </div>
+        {activeSection === 'alumnos' && (
+          <>
+            <div style={{ marginBottom: '1.5rem', position: 'relative', maxWidth: '420px' }}>
+              <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Buscar por nombre o DNI..."
+                style={{ paddingLeft: '2.5rem' }}
+                value={searchTerm}
+                onChange={(event) => setSearchTerm(event.target.value)}
+              />
+            </div>
 
-          <select 
-            className="form-input" 
-            style={{ width: '220px' }}
-            value={sedeSeleccionada}
-            onChange={(e) => setSedeSeleccionada(e.target.value)}
-          >
-            <option value="todas">Ver Todas las Sedes</option>
-            <option value="sede_norte">Sede Norte</option>
-            <option value="sede_centro">Sede Centro</option>
-            <option value="sede_sur">Sede Sur</option>
-          </select>
-        </div>
-
-        {/* Tabla de Alumnos */}
-        <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-          <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
-            <thead>
-              <tr style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                <th style={{ padding: '1rem 1.5rem' }}>Alumno / DNI</th>
-                <th style={{ padding: '1rem 1.5rem' }}>Contacto</th>
-                <th style={{ padding: '1rem 1.5rem' }}>Sede Inscrita</th>
-                <th style={{ padding: '1rem 1.5rem' }}>Profesor Asignado</th>
-                <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>Acciones</th>
-              </tr>
-            </thead>
-            <tbody>
-              {filteredAlumnos.length === 0 ? (
-                <tr>
-                  <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
-                    No hay alumnos registrados en esta sede con los filtros actuales.
-                  </td>
-                </tr>
-              ) : (
-                filteredAlumnos.map(item => (
-                  <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
-                    <td style={{ padding: '1rem 1.5rem' }}>
-                      <div style={{ fontWeight: 600, color: '#fff' }}>{item.nombre}</div>
-                      <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>DNI: {item.dni}</div>
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem' }}>
-                      <div style={{ fontSize: '0.85rem', color: '#fff' }}>{item.email}</div>
-                      <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.telefono}</div>
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem' }}>
-                      <span className="badge-role" style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-cyan)' }}>
-                        {item.sede.replace('sede_', '').toUpperCase()}
-                      </span>
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem', color: 'var(--accent-orange)', fontWeight: 500 }}>
-                      {item.profesorAsignado}
-                    </td>
-                    <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
-                      <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                        <button 
-                          onClick={() => handleOpenEditModal(item)}
-                          className="btn-secondary" 
-                          style={{ padding: '0.4rem 0.8rem', fontSize: '0.8rem' }}
-                        >
-                          <Edit3 size={15} /> Editar
-                        </button>
-                        <button 
-                          onClick={() => handleDeleteStudent(item.id)}
-                          style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.4rem 0.6rem', borderRadius: '6px' }}
-                        >
-                          <Trash2 size={15} />
-                        </button>
-                      </div>
-                    </td>
+            <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                <thead>
+                  <tr style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    <th style={{ padding: '1rem 1.5rem' }}>Alumno / DNI</th>
+                    <th style={{ padding: '1rem 1.5rem' }}>Contacto</th>
+                    <th style={{ padding: '1rem 1.5rem' }}>Sede</th>
+                    <th style={{ padding: '1rem 1.5rem' }}>Profesor</th>
+                    <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>Acciones</th>
                   </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                </thead>
+                <tbody>
+                  {filteredAlumnos.length === 0 ? (
+                    <tr>
+                      <td colSpan="5" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                        No hay alumnos registrados en esta sede con los filtros actuales.
+                      </td>
+                    </tr>
+                  ) : (
+                    filteredAlumnos.map((alumno) => (
+                      <tr key={alumno.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                        <td style={{ padding: '1rem 1.5rem' }}>
+                          <div style={{ fontWeight: 600, color: '#fff' }}>{alumno.nombre}</div>
+                          <div style={{ fontSize: '0.85rem', color: 'var(--text-muted)' }}>DNI: {alumno.dni}</div>
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem' }}>
+                          <div style={{ fontSize: '0.85rem', color: '#fff' }}>{alumno.email}</div>
+                          <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{alumno.telefono}</div>
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem' }}>
+                          <span className="badge-role" style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-cyan)' }}>
+                            {getSedeLabel(alumno.sede)}
+                          </span>
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', color: 'var(--accent-orange)', fontWeight: 500 }}>
+                          {alumno.profesorAsignado}
+                        </td>
+                        <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
+                          <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
+                            <button onClick={() => handleOpenStudentModal(alumno)} className="btn-secondary" style={{ padding: '0.45rem 0.8rem', fontSize: '0.8rem' }}>
+                              <Edit3 size={15} /> Editar
+                            </button>
+                            <button onClick={() => handleDeleteStudent(alumno.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.45rem 0.6rem', borderRadius: '6px' }}>
+                              <Trash2 size={15} />
+                            </button>
+                          </div>
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
 
-        {/* Modal Alta / Edición de Alumno */}
-        {showModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000 }}>
-            <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '500px', border: '1px solid var(--border-color)' }}>
+        {activeSection === 'stock' && (
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <div style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Productos</span>
+                <p style={{ fontSize: '1.8rem', fontWeight: 700 }}>{stockBySede.length}</p>
+              </div>
+              <div style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Stock bajo</span>
+                <p style={{ fontSize: '1.8rem', fontWeight: 700, color: stockBajoCount > 0 ? '#f87171' : 'var(--accent-lime)' }}>{stockBajoCount}</p>
+              </div>
+              <div style={{ background: 'var(--bg-card)', padding: '1.25rem', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)' }}>
+                <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>Movimientos</span>
+                <p style={{ fontSize: '1.8rem', fontWeight: 700, color: 'var(--accent-cyan)' }}>{movimientosBySede.length}</p>
+              </div>
+            </div>
+
+            <div className="stock-workspace">
+              <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+                  <thead>
+                    <tr style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                      <th style={{ padding: '1rem 1.5rem' }}>Producto</th>
+                      <th style={{ padding: '1rem 1.5rem' }}>Stock actual</th>
+                      <th style={{ padding: '1rem 1.5rem' }}>Minimo</th>
+                      <th style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>Acciones</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {stockBySede.length === 0 ? (
+                      <tr>
+                        <td colSpan="4" style={{ padding: '3rem', textAlign: 'center', color: 'var(--text-muted)' }}>
+                          No hay productos cargados en {activeSede?.titulo || 'esta sede'}.
+                        </td>
+                      </tr>
+                    ) : (
+                      stockBySede.map((item) => {
+                        const isLow = item.stockActual <= item.stockMinimo;
+                        return (
+                          <tr key={item.id} style={{ borderBottom: '1px solid var(--border-color)' }}>
+                            <td style={{ padding: '1rem 1.5rem' }}>
+                              <div style={{ fontWeight: 600, color: '#fff' }}>{item.nombre}</div>
+                              <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{item.categoria} · {getSedeLabel(item.sede)}</div>
+                            </td>
+                            <td style={{ padding: '1rem 1.5rem' }}>
+                              <span style={{ color: isLow ? '#f87171' : 'var(--accent-lime)', fontWeight: 800 }}>
+                                {item.stockActual} {item.unidad}
+                              </span>
+                            </td>
+                            <td style={{ padding: '1rem 1.5rem', color: 'var(--text-muted)' }}>
+                              {item.stockMinimo} {item.unidad}
+                            </td>
+                            <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
+                              <div style={{ display: 'flex', gap: '0.45rem', justifyContent: 'flex-end', flexWrap: 'wrap' }}>
+                                <button onClick={() => handleOpenMovementModal(item, 'ingreso')} className="btn-secondary" style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem' }}>
+                                  <ArrowUpCircle size={15} /> Ingreso
+                                </button>
+                                <button onClick={() => handleOpenMovementModal(item, 'egreso')} className="btn-secondary" style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem' }}>
+                                  <ArrowDownCircle size={15} /> Egreso
+                                </button>
+                                <button onClick={() => handleOpenProductModal(item)} className="btn-secondary" style={{ padding: '0.45rem 0.7rem', fontSize: '0.8rem' }}>
+                                  <Edit3 size={15} />
+                                </button>
+                                <button onClick={() => handleDeleteProduct(item.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.45rem 0.6rem', borderRadius: '6px' }}>
+                                  <Trash2 size={15} />
+                                </button>
+                              </div>
+                            </td>
+                          </tr>
+                        );
+                      })
+                    )}
+                  </tbody>
+                </table>
+              </div>
+
+              <aside style={{ background: 'var(--bg-card)', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-md)', padding: '1.25rem' }}>
+                <h2 style={{ fontSize: '1.2rem', marginBottom: '1rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  <History size={18} /> Historial
+                </h2>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '0.8rem', maxHeight: '460px', overflowY: 'auto' }}>
+                  {movimientosBySede.length === 0 ? (
+                    <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>Todavia no hay movimientos en esta sede.</p>
+                  ) : (
+                    movimientosBySede.map((movimiento) => (
+                      <div key={movimiento.id} style={{ background: '#111827', border: '1px solid var(--border-color)', borderRadius: 'var(--radius-sm)', padding: '0.9rem' }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem', marginBottom: '0.3rem' }}>
+                          <strong style={{ color: '#fff' }}>{movimiento.productoNombre}</strong>
+                          <span style={{ color: movimiento.tipo === 'ingreso' ? 'var(--accent-lime)' : '#f87171', fontWeight: 800 }}>
+                            {movimiento.tipo === 'ingreso' ? '+' : '-'}{movimiento.cantidad}
+                          </span>
+                        </div>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.82rem' }}>{movimiento.motivo}</p>
+                        <p style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginTop: '0.45rem' }}>
+                          {movimiento.fecha} · {movimiento.usuario}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </aside>
+            </div>
+          </>
+        )}
+
+        {showStudentModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
+            <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '520px', border: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2>{editingStudent ? 'Editar Alumno' : 'Inscribir Nuevo Alumno'}</h2>
-                <button onClick={() => setShowModal(false)} style={{ background: 'none', color: 'var(--text-muted)' }}>
+                <h2>{editingStudent ? 'Editar alumno' : 'Inscribir alumno'}</h2>
+                <button onClick={() => setShowStudentModal(false)} style={{ background: 'none', color: 'var(--text-muted)' }}>
                   <X size={20} />
                 </button>
               </div>
 
               <form onSubmit={handleSaveStudent}>
                 <div className="form-group">
-                  <label className="form-label">Nombre Completo</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="Ej: Sofía Ramírez"
-                    value={formAlumno.nombre}
-                    onChange={(e) => setFormAlumno({ ...formAlumno, nombre: e.target.value })}
-                    required 
-                  />
+                  <label className="form-label">Nombre completo</label>
+                  <input className="form-input" value={studentForm.nombre} onChange={(event) => setStudentForm({ ...studentForm, nombre: event.target.value })} required />
                 </div>
-
                 <div className="form-group">
-                  <label className="form-label">DNI / Documento</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="40123456"
-                    value={formAlumno.dni}
-                    onChange={(e) => setFormAlumno({ ...formAlumno, dni: e.target.value })}
-                    required 
-                  />
+                  <label className="form-label">DNI</label>
+                  <input className="form-input" value={studentForm.dni} onChange={(event) => setStudentForm({ ...studentForm, dni: event.target.value })} required />
                 </div>
-
                 <div className="form-group">
-                  <label className="form-label">Correo Electrónico</label>
-                  <input 
-                    type="email" 
-                    className="form-input" 
-                    placeholder="sofia@gmail.com"
-                    value={formAlumno.email}
-                    onChange={(e) => setFormAlumno({ ...formAlumno, email: e.target.value })}
-                    required 
-                  />
+                  <label className="form-label">Correo electronico</label>
+                  <input type="email" className="form-input" value={studentForm.email} onChange={(event) => setStudentForm({ ...studentForm, email: event.target.value })} required />
                 </div>
-
                 <div className="form-group">
-                  <label className="form-label">Teléfono de Contacto</label>
-                  <input 
-                    type="text" 
-                    className="form-input" 
-                    placeholder="+54 9 11 4444-5555"
-                    value={formAlumno.telefono}
-                    onChange={(e) => setFormAlumno({ ...formAlumno, telefono: e.target.value })}
-                    required 
-                  />
+                  <label className="form-label">Telefono</label>
+                  <input className="form-input" value={studentForm.telefono} onChange={(event) => setStudentForm({ ...studentForm, telefono: event.target.value })} required />
                 </div>
-
                 <div className="form-group">
-                  <label className="form-label">Sede de Inscripción</label>
-                  <select 
-                    className="form-input"
-                    value={formAlumno.sede}
-                    onChange={(e) => setFormAlumno({ ...formAlumno, sede: e.target.value })}
-                  >
-                    <option value="sede_norte">Sede Norte</option>
-                    <option value="sede_centro">Sede Centro</option>
-                    <option value="sede_sur">Sede Sur</option>
-                  </select>
-                </div>
-
-                <div className="form-group">
-                  <label className="form-label">Profesor Asignado</label>
-                  <select 
-                    className="form-input"
-                    value={formAlumno.profesorAsignado}
-                    onChange={(e) => setFormAlumno({ ...formAlumno, profesorAsignado: e.target.value })}
-                  >
-                    <option value="Carlos Rodríguez">Carlos Rodríguez (Sede Norte/Centro)</option>
-                    <option value="Esteban Benítez">Esteban Benítez (Sede Sur)</option>
-                    <option value="Sin Asignar">Sin Asignar Todavía</option>
-                  </select>
+                  <label className="form-label">Profesor asignado</label>
+                  <input className="form-input" value={studentForm.profesorAsignado} onChange={(event) => setStudentForm({ ...studentForm, profesorAsignado: event.target.value })} required />
                 </div>
 
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                  <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowModal(false)}>
+                  <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowStudentModal(false)}>
                     Cancelar
                   </button>
                   <button type="submit" className="btn-primary" style={{ flex: 1, background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }}>
-                    {editingStudent ? 'Actualizar Alumno' : 'Registrar Alumno'}
+                    Guardar alumno
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showProductModal && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
+            <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '520px', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h2>{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h2>
+                <button onClick={() => setShowProductModal(false)} style={{ background: 'none', color: 'var(--text-muted)' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveProduct}>
+                <div className="form-group">
+                  <label className="form-label">Producto</label>
+                  <input className="form-input" value={productForm.nombre} onChange={(event) => setProductForm({ ...productForm, nombre: event.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Categoria</label>
+                  <input className="form-input" value={productForm.categoria} onChange={(event) => setProductForm({ ...productForm, categoria: event.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Unidad</label>
+                  <input className="form-input" value={productForm.unidad} onChange={(event) => setProductForm({ ...productForm, unidad: event.target.value })} required />
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '1rem' }}>
+                  <div className="form-group">
+                    <label className="form-label">Stock actual</label>
+                    <input type="number" min="0" className="form-input" value={productForm.stockActual} onChange={(event) => setProductForm({ ...productForm, stockActual: event.target.value })} required />
+                  </div>
+                  <div className="form-group">
+                    <label className="form-label">Stock minimo</label>
+                    <input type="number" min="0" className="form-input" value={productForm.stockMinimo} onChange={(event) => setProductForm({ ...productForm, stockMinimo: event.target.value })} required />
+                  </div>
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '1rem' }}>
+                  <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowProductModal(false)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn-primary" style={{ flex: 1, background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }}>
+                    Guardar producto
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {showMovementModal && selectedProduct && (
+          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
+            <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '500px', border: '1px solid var(--border-color)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
+                <h2>{movementForm.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'} de stock</h2>
+                <button onClick={() => setShowMovementModal(false)} style={{ background: 'none', color: 'var(--text-muted)' }}>
+                  <X size={20} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSaveMovement}>
+                <div style={{ background: '#111827', padding: '1rem', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-color)', marginBottom: '1.5rem' }}>
+                  <strong>{selectedProduct.nombre}</strong>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
+                    Stock actual: {selectedProduct.stockActual} {selectedProduct.unidad}
+                  </p>
+                </div>
+
+                <div className="form-group">
+                  <label className="form-label">Tipo de movimiento</label>
+                  <select className="form-input" value={movementForm.tipo} onChange={(event) => setMovementForm({ ...movementForm, tipo: event.target.value })}>
+                    <option value="ingreso">Ingreso</option>
+                    <option value="egreso">Egreso</option>
+                  </select>
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Cantidad</label>
+                  <input type="number" min="1" className="form-input" value={movementForm.cantidad} onChange={(event) => setMovementForm({ ...movementForm, cantidad: event.target.value })} required />
+                </div>
+                <div className="form-group">
+                  <label className="form-label">Motivo</label>
+                  <input className="form-input" value={movementForm.motivo} onChange={(event) => setMovementForm({ ...movementForm, motivo: event.target.value })} placeholder="Ej: compra, reposicion, limpieza diaria" />
+                </div>
+
+                <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
+                  <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowMovementModal(false)}>
+                    Cancelar
+                  </button>
+                  <button type="submit" className="btn-primary" style={{ flex: 1, background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }}>
+                    Registrar
                   </button>
                 </div>
               </form>

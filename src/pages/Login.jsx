@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { useAuth } from '../context/AuthContext';
-import { Dumbbell, ArrowLeft, LogIn, AlertCircle } from 'lucide-react';
+import { Link, useNavigate } from 'react-router-dom';
+import { AlertCircle, ArrowLeft, Dumbbell, LogIn } from 'lucide-react';
+import { useAuth } from '../context/auth';
 
 const Login = () => {
   const [email, setEmail] = useState('');
@@ -9,7 +9,7 @@ const Login = () => {
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const { login } = useAuth();
+  const { getRoleHomePath, login } = useAuth();
   const navigate = useNavigate();
 
   const handleSubmit = async (e) => {
@@ -18,11 +18,11 @@ const Login = () => {
     setLoading(true);
 
     try {
-      await login(email, password);
-      navigate('/admin');
+      const { profile } = await login(email, password);
+      navigate(getRoleHomePath(profile.rol), { replace: true });
     } catch (err) {
       console.error(err);
-      setError('Credenciales inválidas o cuenta no registrada.');
+      setError(err.message || 'Credenciales invalidas o cuenta no registrada.');
     } finally {
       setLoading(false);
     }
@@ -41,7 +41,7 @@ const Login = () => {
         fontWeight: 600,
         textDecoration: 'none'
       }}>
-        <ArrowLeft size={18} /> Volver al Sitio Informativo
+        <ArrowLeft size={18} /> Volver al sitio informativo
       </Link>
 
       <div className="auth-card">
@@ -75,32 +75,32 @@ const Login = () => {
 
         <form onSubmit={handleSubmit}>
           <div className="form-group">
-            <label className="form-label">Correo Electrónico</label>
-            <input 
-              type="email" 
-              className="form-input" 
+            <label className="form-label">Correo electronico</label>
+            <input
+              type="email"
+              className="form-input"
               placeholder="nombre@animapp.com"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              required 
+              required
             />
           </div>
 
           <div className="form-group">
-            <label className="form-label">Contraseña</label>
-            <input 
-              type="password" 
-              className="form-input" 
-              placeholder="••••••••"
+            <label className="form-label">Contrasena</label>
+            <input
+              type="password"
+              className="form-input"
+              placeholder="********"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
-              required 
+              required
             />
           </div>
 
           <button type="submit" className="btn-primary btn-full" disabled={loading}>
             <LogIn size={18} />
-            {loading ? 'Iniciando Sesión...' : 'Ingresar a Plataforma AnimApp'}
+            {loading ? 'Iniciando sesion...' : 'Ingresar a Plataforma AnimApp'}
           </button>
         </form>
       </div>

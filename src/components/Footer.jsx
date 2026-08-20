@@ -1,5 +1,6 @@
 import React from 'react';
-import { Dumbbell, MapPin, Phone, Mail } from 'lucide-react';
+import { Dumbbell, Mail, MapPin, Phone } from 'lucide-react';
+import { SEDES } from '../constants/appData';
 
 const Footer = () => {
   return (
@@ -13,27 +14,23 @@ const Footer = () => {
             <span>ANIM<span style={{ color: 'var(--accent-orange)' }}>APP</span></span>
           </div>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.95rem' }}>
-            Plataforma integral de gestión de sedes, seguimiento personalizado de alumnos y creación de rutinas dinámicas de alto rendimiento.
+            Plataforma integral para sedes, alumnos, rutinas y stock operativo del gimnasio.
           </p>
         </div>
 
         <div>
-          <h4 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '1.2rem' }}>Nuestras Sedes</h4>
+          <h4 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '1.2rem' }}>Nuestras sedes</h4>
           <ul style={{ listStyle: 'none', display: 'flex', flexDirection: 'column', gap: '0.8rem', color: 'var(--text-muted)', fontSize: '0.9rem' }}>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <MapPin size={16} color="var(--accent-orange)" /> <strong>Sede Norte:</strong> Av. Libertador 4500
-            </li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <MapPin size={16} color="var(--accent-cyan)" /> <strong>Sede Centro:</strong> Calle Corrientes 1250
-            </li>
-            <li style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-              <MapPin size={16} color="var(--accent-lime)" /> <strong>Sede Sur:</strong> Av. Hipólito Yrigoyen 890
-            </li>
+            {SEDES.map((sede) => (
+              <li key={sede.id} style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                <MapPin size={16} color={sede.color} /> <strong>{sede.titulo}:</strong> {sede.direccion}
+              </li>
+            ))}
           </ul>
         </div>
 
         <div>
-          <h4 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '1.2rem' }}>Contacto & Soporte</h4>
+          <h4 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '1.2rem' }}>Contacto y soporte</h4>
           <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
             <Phone size={16} color="var(--accent-orange)" /> +54 11 4000-8000
           </p>
@@ -44,7 +41,7 @@ const Footer = () => {
       </div>
 
       <div className="container" style={{ textAlign: 'center', paddingTop: '2rem', borderTop: '1px solid rgba(255,255,255,0.05)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-        © {new Date().getFullYear()} AnimApp Gimnasios - Sistema de Gestión de Sedes
+        © {new Date().getFullYear()} AnimApp Gimnasios - Sistema de gestion de sedes
       </div>
     </footer>
   );

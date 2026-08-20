@@ -1,0 +1,125 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function userProfilePath(uid) {
+      return /databases/$(database)/documents/users/$(uid);
+    }
+
+    function hasProfile() {
+      return signedIn() && exists(userProfilePath(request.auth.uid));
+    }
+
+    function profile() {
+      return get(userProfilePath(request.auth.uid)).data;
+    }
+
+    function isActive() {
+      return hasProfile() && profile().activo == true;
+    }
+
+    function hasRole(role) {
+      return isActive() && profile().rol == role;
+    }
+
+    function isAdmin() {
+      return hasRole('admin');
+    }
+
+    function profileHasSede(sedeId) {
+      return isAdmin()
+        || (
+          isActive()
+          && (
+            ('sedeIds' in profile().keys() && profile().sedeIds.hasAny([sedeId]))
+            || ('sedes' in profile().keys() && profile().sedes.hasAny([sedeId]))
+          )
+        );
+    }
+
+    function isStaffForSede(sedeId) {
+      return profileHasSede(sedeId)
+        && (profile().rol in ['profesor', 'recepcionista']);
+    }
+
+    function isProfesorForSede(sedeId) {
+      return profileHasSede(sedeId) && hasRole('profesor');
+    }
+
+    function isRecepcionForSede(sedeId) {
+      return profileHasSede(sedeId) && hasRole('recepcionista');
+    }
+
+    match /sedes/{sedeId} {
+      allow read: if signedIn();
+      allow write: if isAdmin();
+    }
+
+    match /users/{userId} {
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
+      allow create, update, delete: if isAdmin();
+    }
+
+    match /alumnos/{alumnoId} {
+      allow read: if isAdmin()
+        || (signedIn() && request.auth.uid == resource.data.userId)
+        || isStaffForSede(resource.data.sedeId);
+
+      allow create: if isAdmin() || isStaffForSede(request.resource.data.sedeId);
+
+      allow update, delete: if isAdmin()
+        || (
+          isStaffForSede(resource.data.sedeId)
+          && request.resource.data.sedeId == resource.data.sedeId
+        );
+    }
+
+    match /ejercicios/{ejercicioId} {
+      allow read: if isActive();
+      allow create, update, delete: if isAdmin() || hasRole('profesor');
+    }
+
+    match /rutinas/{rutinaId} {
+      allow read: if isAdmin()
+        || (signedIn() && request.auth.uid == resource.data.alumnoUserId)
+        || isProfesorForSede(resource.data.sedeId);
+
+      allow create: if isAdmin() || isProfesorForSede(request.resource.data.sedeId);
+
+      allow update, delete: if isAdmin()
+        || (
+          isProfesorForSede(resource.data.sedeId)
+          && request.resource.data.sedeId == resource.data.sedeId
+        );
+    }
+
+    match /stockItems/{itemId} {
+      allow read: if isAdmin() || isRecepcionForSede(resource.data.sedeId);
+
+      allow create: if isAdmin() || isRecepcionForSede(request.resource.data.sedeId);
+
+      allow update, delete: if isAdmin()
+        || (
+          isRecepcionForSede(resource.data.sedeId)
+          && request.resource.data.sedeId == resource.data.sedeId
+        );
+    }
+
+    match /stockMovimientos/{movimientoId} {
+      allow read: if isAdmin() || isRecepcionForSede(resource.data.sedeId);
+
+      allow create: if (isAdmin() || isRecepcionForSede(request.resource.data.sedeId))
+        && request.resource.data.userId == request.auth.uid;
+
+      allow update, delete: if false;
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

@@ -7,8 +7,10 @@ import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfesorDashboard from './pages/ProfesorDashboard';
 import RecepcionDashboard from './pages/RecepcionDashboard';
+import AlumnoDashboard from './pages/AlumnoDashboard';
 import Unauthorized from './pages/Unauthorized';
 import ProtectedRoute from './components/ProtectedRoute';
+import { ROLES } from './constants/appData';
 
 function App() {
   return (
@@ -23,16 +25,20 @@ function App() {
           <Route path="/unauthorized" element={<Unauthorized />} />
 
           {/* Rutas Protegidas por Rol Institucional */}
-          <Route element={<ProtectedRoute allowedRoles={['admin']} />}>
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]} />}>
             <Route path="/admin" element={<AdminDashboard />} />
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['profesor', 'admin']} />}>
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.PROFESOR, ROLES.ADMIN]} />}>
             <Route path="/profesor" element={<ProfesorDashboard />} />
           </Route>
 
-          <Route element={<ProtectedRoute allowedRoles={['recepcionista', 'admin']} />}>
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.RECEPCIONISTA, ROLES.ADMIN]} />}>
             <Route path="/recepcion" element={<RecepcionDashboard />} />
+          </Route>
+
+          <Route element={<ProtectedRoute allowedRoles={[ROLES.ALUMNO, ROLES.ADMIN]} />}>
+            <Route path="/alumno" element={<AlumnoDashboard />} />
           </Route>
         </Routes>
       </Router>
