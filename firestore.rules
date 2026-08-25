@@ -60,21 +60,38 @@ service cloud.firestore {
     }
 
     match /users/{userId} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
+      allow read: if isAdmin()
+        || (signedIn() && request.auth.uid == userId)
+        || (
+          hasRole('recepcionista')
+          && resource.data.rol in ['profesor', 'alumno']
+          && resource.data.activo == true
+          && resource.data.sedeIds.hasAny(profile().sedeIds)
+        );
       allow create, update, delete: if isAdmin();
     }
 
     match /alumnos/{alumnoId} {
       allow read: if isAdmin()
         || (signedIn() && request.auth.uid == resource.data.userId)
-        || isStaffForSede(resource.data.sedeId);
+        || isRecepcionForSede(resource.data.sedeId)
+        || (
+          isProfesorForSede(resource.data.sedeId)
+          && resource.data.profesorId == request.auth.uid
+        );
 
       allow create: if isAdmin() || isStaffForSede(request.resource.data.sedeId);
 
       allow update, delete: if isAdmin()
         || (
-          isStaffForSede(resource.data.sedeId)
+          isRecepcionForSede(resource.data.sedeId)
           && request.resource.data.sedeId == resource.data.sedeId
+        )
+        || (
+          isProfesorForSede(resource.data.sedeId)
+          && resource.data.profesorId == request.auth.uid
+          && request.resource.data.sedeId == resource.data.sedeId
+          && request.resource.data.profesorId == resource.data.profesorId
         );
     }
 

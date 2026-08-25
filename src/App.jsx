@@ -5,6 +5,7 @@ import { AuthProvider } from './context/AuthContext';
 import Landing from './pages/Landing';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
+import AdminStock from './pages/AdminStock';
 import ProfesorDashboard from './pages/ProfesorDashboard';
 import RecepcionDashboard from './pages/RecepcionDashboard';
 import AlumnoDashboard from './pages/AlumnoDashboard';
@@ -27,6 +28,7 @@ function App() {
           {/* Rutas Protegidas por Rol Institucional */}
           <Route element={<ProtectedRoute allowedRoles={[ROLES.ADMIN]} />}>
             <Route path="/admin" element={<AdminDashboard />} />
+            <Route path="/admin/stock" element={<AdminStock />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={[ROLES.PROFESOR, ROLES.ADMIN]} />}>

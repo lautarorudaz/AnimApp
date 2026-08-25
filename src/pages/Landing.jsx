@@ -19,6 +19,7 @@ import {
 } from 'lucide-react';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
+import ArevalitoChat from '../components/ArevalitoChat';
 import heroLeft from '../assets/gym-hero-left.png';
 import heroRight from '../assets/gym-hero-right.png';
 import { SEDES } from '../constants/appData';
@@ -209,6 +210,7 @@ const Landing = () => {
       </section>
 
       <Footer />
+      <ArevalitoChat />
 
       {selectedSede && activeProfessor && (
         <div

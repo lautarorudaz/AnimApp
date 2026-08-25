@@ -1,14 +1,17 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { deleteApp, initializeApp } from 'firebase/app';
+import { createUserWithEmailAndPassword, deleteUser, getAuth } from 'firebase/auth';
+import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
 import {
   Building2,
   Check,
   ClipboardList,
   Dumbbell,
   Edit3,
-  Home,
   LogOut,
   MapPin,
+  PackageSearch,
   Plus,
   Search,
   Shield,
@@ -19,17 +22,7 @@ import {
 } from 'lucide-react';
 import { ROLES, ROLE_LABELS, SEDES, getSedeLabel } from '../constants/appData';
 import { useAuth } from '../context/auth';
-
-const initialPeople = [
-  { id: 'a-001', nombre: 'Gonzalo Perez', email: 'gonzalo@gmail.com', telefono: '+54 9 11 5555-1111', rol: ROLES.ALUMNO, sedes: ['moreno'], estado: 'Activo' },
-  { id: 'a-002', nombre: 'Camila Torres', email: 'camila@gmail.com', telefono: '+54 9 11 5555-2222', rol: ROLES.ALUMNO, sedes: ['edison'], estado: 'Activo' },
-  { id: 'a-003', nombre: 'Roberto Sanchez', email: 'roberto@gmail.com', telefono: '+54 9 11 5555-3333', rol: ROLES.ALUMNO, sedes: ['general-san-martin'], estado: 'Activo' },
-  { id: 'a-004', nombre: 'Martina Acosta', email: 'martina@gmail.com', telefono: '+54 9 11 5555-4444', rol: ROLES.ALUMNO, sedes: ['moreno'], estado: 'Inactivo' },
-  { id: 'p-001', nombre: 'Carlos Rodriguez', email: 'carlos@animapp.com', telefono: '+54 9 11 4444-1111', rol: ROLES.PROFESOR, sedes: ['moreno', 'edison'], estado: 'Activo' },
-  { id: 'p-002', nombre: 'Esteban Benitez', email: 'esteban@animapp.com', telefono: '+54 9 11 4444-2222', rol: ROLES.PROFESOR, sedes: ['general-san-martin'], estado: 'Activo' },
-  { id: 'r-001', nombre: 'Mariana Lopez', email: 'mariana@animapp.com', telefono: '+54 9 11 3333-1111', rol: ROLES.RECEPCIONISTA, sedes: ['moreno'], estado: 'Activo' },
-  { id: 'r-002', nombre: 'Lucia Fernandez', email: 'lucia@animapp.com', telefono: '+54 9 11 3333-2222', rol: ROLES.RECEPCIONISTA, sedes: ['edison', 'general-san-martin'], estado: 'Activo' }
-];
+import { auth, db } from '../firebase/config';
 
 const roleFilters = [
   { id: 'todos', label: 'Todas', icon: Users },
@@ -41,6 +34,7 @@ const roleFilters = [
 const getEmptyPerson = (preferredSede = 'moreno') => ({
   nombre: '',
   email: '',
+  password: '',
   telefono: '',
   rol: ROLES.ALUMNO,
   sedes: [preferredSede],
@@ -58,7 +52,11 @@ const getInitials = (name) => name
 const AdminDashboard = () => {
   const { logout, userProfile } = useAuth();
   const navigate = useNavigate();
-  const [people, setPeople] = useState(initialPeople);
+  const [accountPeople, setAccountPeople] = useState([]);
+  const [studentRecords, setStudentRecords] = useState([]);
+  const pendingBackfills = useRef(new Set());
+  const [isLoadingPeople, setIsLoadingPeople] = useState(true);
+  const [dataError, setDataError] = useState('');
   const [activeSedeFilter, setActiveSedeFilter] = useState('todas');
   const [activeRoleFilter, setActiveRoleFilter] = useState('todos');
   const [searchTerm, setSearchTerm] = useState('');
@@ -67,6 +65,38 @@ const AdminDashboard = () => {
   const [personToDelete, setPersonToDelete] = useState(null);
   const [personForm, setPersonForm] = useState(() => getEmptyPerson());
   const [feedback, setFeedback] = useState('');
+  const [isSaving, setIsSaving] = useState(false);
+
+  const people = useMemo(() => {
+    const studentsByUserId = new Map(studentRecords.filter((student) => student.userId).map((student) => [student.userId, student]));
+    const accountIds = new Set(accountPeople.map((person) => person.id));
+    const accounts = accountPeople.map((person) => {
+      const student = person.rol === ROLES.ALUMNO ? studentsByUserId.get(person.id) : null;
+      return student ? {
+        ...person,
+        nombre: student.nombre || person.nombre,
+        email: student.email || person.email,
+        telefono: student.telefono || person.telefono,
+        sedes: [student.sedeId],
+        estado: student.activo === false ? 'Inactivo' : 'Activo',
+        studentRecordId: student.id,
+        recordType: 'account'
+      } : { ...person, recordType: 'account' };
+    });
+    const receptionStudents = studentRecords
+      .filter((student) => !student.userId || !accountIds.has(student.userId))
+      .map((student) => ({
+        id: student.id,
+        nombre: student.nombre,
+        email: student.email || '',
+        telefono: student.telefono || '',
+        rol: ROLES.ALUMNO,
+        sedes: [student.sedeId],
+        estado: student.activo === false ? 'Inactivo' : 'Activo',
+        recordType: 'student'
+      }));
+    return [...accounts, ...receptionStudents].sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+  }, [accountPeople, studentRecords]);
 
   const peopleForSelectedSede = useMemo(() => {
     if (activeSedeFilter === 'todas') return people;
@@ -86,11 +116,83 @@ const AdminDashboard = () => {
     return peopleForSelectedSede.filter((person) => {
       const matchesRole = activeRoleFilter === 'todos' || person.rol === activeRoleFilter;
       const matchesSearch = !query || [person.nombre, person.email, person.telefono]
-        .some((value) => value.toLowerCase().includes(query));
+        .some((value) => (value || '').toLowerCase().includes(query));
 
       return matchesRole && matchesSearch;
     });
   }, [activeRoleFilter, peopleForSelectedSede, searchTerm]);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'users'), (snapshot) => {
+      const nextPeople = snapshot.docs
+        .map((personDoc) => {
+          const data = personDoc.data();
+          return {
+            id: personDoc.id,
+            ...data,
+            sedes: data.sedes || data.sedeIds || [],
+            estado: data.activo === false ? 'Inactivo' : 'Activo'
+          };
+        })
+        .filter((person) => person.rol !== ROLES.ADMIN && !person.eliminado)
+        .sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es'));
+
+      setAccountPeople(nextPeople);
+      setDataError('');
+      setIsLoadingPeople(false);
+    }, (error) => {
+      console.error('Error al cargar personas desde Firestore:', error);
+      setDataError('No pudimos cargar las personas. Revisá tu conexión o los permisos de Firebase.');
+      setIsLoadingPeople(false);
+    });
+
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const unsubscribe = onSnapshot(collection(db, 'alumnos'), (snapshot) => {
+      setStudentRecords(snapshot.docs.map((studentDoc) => ({ id: studentDoc.id, ...studentDoc.data() })));
+    }, (error) => {
+      console.error('Error al cargar fichas de alumnos:', error);
+      setDataError('No pudimos sincronizar las fichas operativas de alumnos.');
+    });
+    return unsubscribe;
+  }, []);
+
+  useEffect(() => {
+    const linkedUserIds = new Set(studentRecords.map((student) => student.userId || student.id));
+    const missingStudents = accountPeople.filter((person) => (
+      person.rol === ROLES.ALUMNO
+      && !linkedUserIds.has(person.id)
+      && !pendingBackfills.current.has(person.id)
+    ));
+
+    missingStudents.forEach((person) => {
+      pendingBackfills.current.add(person.id);
+      setDoc(doc(db, 'alumnos', person.id), {
+        userId: person.id,
+        nombre: person.nombre,
+        dni: '',
+        email: person.email,
+        telefono: person.telefono || '',
+        direccion: '',
+        fechaNacimiento: '',
+        fechaIngreso: new Date().toISOString().slice(0, 10),
+        profesorId: '',
+        profesorAsignado: 'Sin asignar',
+        activo: person.activo !== false,
+        observaciones: 'Ficha sincronizada desde Administración. Completar datos en Recepción.',
+        sedeId: person.sedes[0],
+        createdAt: serverTimestamp(),
+        updatedAt: serverTimestamp(),
+        createdBy: userProfile?.uid || ''
+      }).catch((error) => {
+        pendingBackfills.current.delete(person.id);
+        console.error('Error al sincronizar alumno existente:', error);
+        setDataError(`No pudimos sincronizar la ficha de ${person.nombre}.`);
+      });
+    });
+  }, [accountPeople, studentRecords, userProfile?.uid]);
 
   useEffect(() => {
     if (!isFormOpen && !personToDelete) return undefined;
@@ -120,16 +222,19 @@ const AdminDashboard = () => {
 
   const openCreateForm = () => {
     const defaultSede = activeSedeFilter === 'todas' ? SEDES[0].id : activeSedeFilter;
+    setDataError('');
     setEditingPerson(null);
     setPersonForm(getEmptyPerson(defaultSede));
     setIsFormOpen(true);
   };
 
   const openEditForm = (person) => {
+    setDataError('');
     setEditingPerson(person);
     setPersonForm({
       nombre: person.nombre,
       email: person.email,
+      password: '',
       telefono: person.telefono,
       rol: person.rol,
       sedes: [...person.sedes],
@@ -167,32 +272,157 @@ const AdminDashboard = () => {
     });
   };
 
-  const handleSavePerson = (event) => {
+  const handleSavePerson = async (event) => {
     event.preventDefault();
+    setIsSaving(true);
+    setDataError('');
     const normalizedPerson = {
-      ...personForm,
       nombre: personForm.nombre.trim(),
       email: personForm.email.trim(),
-      telefono: personForm.telefono.trim()
+      telefono: personForm.telefono.trim(),
+      rol: personForm.rol,
+      role: personForm.rol,
+      sedes: personForm.sedes,
+      sedeIds: personForm.sedes,
+      activo: personForm.estado === 'Activo',
+      active: personForm.estado === 'Activo',
+      eliminado: false
     };
 
-    if (editingPerson) {
-      setPeople((current) => current.map((person) => (
-        person.id === editingPerson.id ? { ...person, ...normalizedPerson } : person
-      )));
-      setFeedback('Los cambios se guardaron correctamente.');
-    } else {
-      setPeople((current) => [{ id: `person-${Date.now()}`, ...normalizedPerson }, ...current]);
-      setFeedback('La persona se agregó correctamente.');
-    }
+    try {
+      if (editingPerson) {
+        if (editingPerson.recordType === 'student') {
+          await updateDoc(doc(db, 'alumnos', editingPerson.id), {
+            nombre: normalizedPerson.nombre,
+            email: normalizedPerson.email,
+            telefono: normalizedPerson.telefono,
+            sedeId: normalizedPerson.sedes[0],
+            activo: normalizedPerson.activo,
+            updatedAt: serverTimestamp(),
+            updatedBy: userProfile?.uid || ''
+          });
+        } else {
+          await updateDoc(doc(db, 'users', editingPerson.id), {
+            ...normalizedPerson,
+            updatedAt: serverTimestamp()
+          });
 
-    closeForm();
+          if (normalizedPerson.rol === ROLES.ALUMNO) {
+            await setDoc(doc(db, 'alumnos', editingPerson.studentRecordId || editingPerson.id), {
+              userId: editingPerson.id,
+              nombre: normalizedPerson.nombre,
+              email: normalizedPerson.email,
+              telefono: normalizedPerson.telefono,
+              sedeId: normalizedPerson.sedes[0],
+              activo: normalizedPerson.activo,
+              updatedAt: serverTimestamp(),
+              updatedBy: userProfile?.uid || ''
+            }, { merge: true });
+          } else if (editingPerson.rol === ROLES.ALUMNO) {
+            await deleteDoc(doc(db, 'alumnos', editingPerson.studentRecordId || editingPerson.id));
+          }
+        }
+        setFeedback('Los cambios se guardaron correctamente.');
+      } else {
+        const secondaryApp = initializeApp(auth.app.options, `create-user-${Date.now()}`);
+        const secondaryAuth = getAuth(secondaryApp);
+        let createdUser = null;
+
+        try {
+          const credential = await createUserWithEmailAndPassword(
+            secondaryAuth,
+            normalizedPerson.email,
+            personForm.password
+          );
+          createdUser = credential.user;
+          await setDoc(doc(db, 'users', createdUser.uid), {
+            ...normalizedPerson,
+            uid: createdUser.uid,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+
+          if (normalizedPerson.rol === ROLES.ALUMNO) {
+            await setDoc(doc(db, 'alumnos', createdUser.uid), {
+              userId: createdUser.uid,
+              nombre: normalizedPerson.nombre,
+              dni: '',
+              email: normalizedPerson.email,
+              telefono: normalizedPerson.telefono,
+              direccion: '',
+              fechaNacimiento: '',
+              fechaIngreso: new Date().toISOString().slice(0, 10),
+              profesorId: '',
+              profesorAsignado: 'Sin asignar',
+              activo: normalizedPerson.activo,
+              observaciones: 'Cuenta creada desde Administración. Completar DNI y datos en Recepción.',
+              sedeId: normalizedPerson.sedes[0],
+              createdAt: serverTimestamp(),
+              updatedAt: serverTimestamp(),
+              createdBy: userProfile?.uid || ''
+            });
+          }
+        } catch (error) {
+          if (createdUser) {
+            await Promise.allSettled([
+              deleteDoc(doc(db, 'users', createdUser.uid)),
+              deleteDoc(doc(db, 'alumnos', createdUser.uid)),
+              deleteUser(createdUser)
+            ]);
+          }
+          throw error;
+        } finally {
+          await deleteApp(secondaryApp);
+        }
+
+        setFeedback('La cuenta se creó y ya puede iniciar sesión.');
+      }
+
+      closeForm();
+    } catch (error) {
+      console.error('Error al guardar la persona:', error);
+      const message = error.code === 'auth/email-already-in-use'
+        ? 'Ese correo ya tiene una cuenta registrada.'
+        : error.code === 'auth/weak-password'
+          ? 'La contraseña debe tener al menos 6 caracteres.'
+          : 'No pudimos guardar la persona. Revisá los datos y los permisos de Firebase.';
+      setDataError(message);
+    } finally {
+      setIsSaving(false);
+    }
   };
 
-  const confirmDeletePerson = () => {
-    setPeople((current) => current.filter((person) => person.id !== personToDelete.id));
-    setFeedback(`${personToDelete.nombre} fue eliminado.`);
-    setPersonToDelete(null);
+  const confirmDeletePerson = async () => {
+    const person = personToDelete;
+    setIsSaving(true);
+    try {
+      if (person.recordType === 'student') {
+        await deleteDoc(doc(db, 'alumnos', person.id));
+        setFeedback(`${person.nombre} fue eliminado.`);
+        setPersonToDelete(null);
+        return;
+      }
+      await updateDoc(doc(db, 'users', person.id), {
+        activo: false,
+        active: false,
+        eliminado: true,
+        updatedAt: serverTimestamp()
+      });
+      if (person.rol === ROLES.ALUMNO) {
+        await setDoc(doc(db, 'alumnos', person.studentRecordId || person.id), {
+          activo: false,
+          updatedAt: serverTimestamp(),
+          updatedBy: userProfile?.uid || ''
+        }, { merge: true });
+      }
+      setFeedback(`${person.nombre} fue eliminado y ya no puede iniciar sesión.`);
+      setPersonToDelete(null);
+    } catch (error) {
+      console.error('Error al eliminar la persona:', error);
+      setDataError('No pudimos eliminar la persona. Revisá los permisos de Firebase.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
@@ -212,9 +442,9 @@ const AdminDashboard = () => {
               <Users size={19} />
               <span>Personas</span>
             </button>
-            <button type="button" className="admin-nav-item" onClick={() => navigate('/')}>
-              <Home size={19} />
-              <span>Sitio público</span>
+            <button type="button" className="admin-nav-item" onClick={() => navigate('/admin/stock')}>
+              <PackageSearch size={19} />
+              <span>Gestión de Stock</span>
             </button>
           </nav>
         </div>
@@ -235,6 +465,7 @@ const AdminDashboard = () => {
       </aside>
 
       <main className="main-content admin-main-content">
+        {dataError && <div className="admin-data-error" role="alert">{dataError}</div>}
         <header className="admin-page-header">
           <div>
             <span className="admin-eyebrow">Panel de administración</span>
@@ -329,7 +560,14 @@ const AdminDashboard = () => {
                 </tr>
               </thead>
               <tbody>
-                {filteredPeople.length === 0 ? (
+                {isLoadingPeople ? (
+                  <tr>
+                    <td colSpan="6" className="admin-empty-state">
+                      <Users size={28} />
+                      <strong>Cargando personas...</strong>
+                    </td>
+                  </tr>
+                ) : filteredPeople.length === 0 ? (
                   <tr>
                     <td colSpan="6" className="admin-empty-state">
                       <Users size={28} />
@@ -413,6 +651,7 @@ const AdminDashboard = () => {
             </header>
 
             <form className="admin-person-form" onSubmit={handleSavePerson}>
+              {dataError && <div className="admin-data-error" role="alert">{dataError}</div>}
               <div className="admin-form-grid">
                 <label className="admin-field admin-field-wide">
                   <span>Nombre completo</span>
@@ -433,11 +672,28 @@ const AdminDashboard = () => {
                     value={personForm.email}
                     onChange={(event) => setPersonForm({ ...personForm, email: event.target.value })}
                     placeholder="nombre@email.com"
+                    disabled={Boolean(editingPerson)}
                     required
                   />
+                  {editingPerson && <small>El correo de acceso no se puede cambiar desde este panel.</small>}
                 </label>
 
-                <label className="admin-field">
+                {!editingPerson && (
+                  <label className="admin-field">
+                    <span>Contraseña temporal</span>
+                    <input
+                      type="password"
+                      value={personForm.password}
+                      onChange={(event) => setPersonForm({ ...personForm, password: event.target.value })}
+                      placeholder="Mínimo 6 caracteres"
+                      minLength="6"
+                      required
+                    />
+                    <small>Compartila de forma privada con la persona.</small>
+                  </label>
+                )}
+
+                <label className={editingPerson ? 'admin-field' : 'admin-field admin-field-wide'}>
                   <span>Teléfono</span>
                   <input
                     type="tel"
@@ -498,8 +754,8 @@ const AdminDashboard = () => {
 
               <footer className="admin-modal-actions">
                 <button type="button" className="btn-secondary" onClick={closeForm}>Cancelar</button>
-                <button type="submit" className="btn-primary">
-                  {editingPerson ? 'Guardar cambios' : 'Agregar persona'}
+                <button type="submit" className="btn-primary" disabled={isSaving}>
+                  {isSaving ? 'Guardando...' : editingPerson ? 'Guardar cambios' : 'Crear cuenta'}
                 </button>
               </footer>
             </form>
@@ -523,7 +779,9 @@ const AdminDashboard = () => {
             </p>
             <div className="admin-modal-actions">
               <button type="button" className="btn-secondary" onClick={() => setPersonToDelete(null)}>Cancelar</button>
-              <button type="button" className="admin-danger-button" onClick={confirmDeletePerson}>Eliminar</button>
+              <button type="button" className="admin-danger-button" onClick={confirmDeletePerson} disabled={isSaving}>
+                {isSaving ? 'Eliminando...' : 'Eliminar'}
+              </button>
             </div>
           </section>
         </div>
