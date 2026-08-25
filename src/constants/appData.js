@@ -25,21 +25,45 @@ export const SEDES = [
     nombre: 'Moreno',
     titulo: 'Sede Moreno',
     direccion: 'Moreno',
-    color: 'var(--accent-orange)'
+    color: 'var(--accent-orange)',
+    resumen: 'Entrenamiento de fuerza, musculacion y seguimiento personalizado.',
+    horarios: ['Lunes a viernes de 6:00 a 23:00', 'Sabados de 9:00 a 18:00'],
+    foto: '',
+    whatsapp: '',
+    profesores: [
+      { id: 'carlos-rodriguez', nombre: 'Carlos Rodriguez', horario: 'Lunes a viernes de 6:00 a 14:00', foto: '' },
+      { id: 'julieta-gomez', nombre: 'Julieta Gomez', horario: 'Lunes a viernes de 14:00 a 23:00', foto: '' }
+    ]
   },
   {
     id: 'edison',
     nombre: 'Edison',
     titulo: 'Sede Edison',
-    direccion: 'Edison',
-    color: 'var(--accent-cyan)'
+    direccion: 'Edison 46',
+    color: 'var(--accent-cyan)',
+    resumen: 'Rutinas guiadas, evaluaciones fisicas y clases para todos los niveles.',
+    horarios: ['Lunes a viernes de 6:00 a 23:00', 'Sabados de 9:00 a 18:00'],
+    foto: '',
+    whatsapp: '',
+    profesores: [
+      { id: 'sofia-ramirez', nombre: 'Sofia Ramirez', horario: 'Lunes a viernes de 6:00 a 14:00', foto: '' },
+      { id: 'matias-torres', nombre: 'Matias Torres', horario: 'Lunes a viernes de 14:00 a 23:00', foto: '' }
+    ]
   },
   {
     id: 'general-san-martin',
     nombre: 'General San Martin',
     titulo: 'Sede General San Martin',
     direccion: 'General San Martin',
-    color: 'var(--accent-lime)'
+    color: 'var(--accent-lime)',
+    resumen: 'Musculacion, rehabilitacion y entrenamiento tecnico supervisado.',
+    horarios: ['Lunes a viernes de 6:00 a 23:00', 'Sabados de 9:00 a 18:00'],
+    foto: '',
+    whatsapp: '',
+    profesores: [
+      { id: 'valentina-lopez', nombre: 'Valentina Lopez', horario: 'Lunes a viernes de 6:00 a 15:00', foto: '' },
+      { id: 'nicolas-perez', nombre: 'Nicolas Perez', horario: 'Lunes a viernes de 15:00 a 23:00', foto: '' }
+    ]
   }
 ];
 

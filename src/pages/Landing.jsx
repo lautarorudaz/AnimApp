@@ -1,21 +1,110 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowRight, Bot, Dumbbell, Lock, Shield, Sparkles, Users } from 'lucide-react';
+import {
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardCheck,
+  Clock3,
+  Dumbbell,
+  Handshake,
+  Image as ImageIcon,
+  Lock,
+  MapPin,
+  MessageCircle,
+  Smartphone,
+  Sparkles,
+  UserRound,
+  X
+} from 'lucide-react';
 import Footer from '../components/Footer';
 import Navbar from '../components/Navbar';
 import heroLeft from '../assets/gym-hero-left.png';
 import heroRight from '../assets/gym-hero-right.png';
 import { SEDES } from '../constants/appData';
 
-const sedeHighlights = {
-  moreno: 'Entrenamiento de fuerza, musculacion y seguimiento personalizado.',
-  edison: 'Rutinas guiadas, evaluaciones fisicas y clases para todos los niveles.',
-  'general-san-martin': 'Musculacion, rehabilitacion y entrenamiento tecnico supervisado.'
+const methodologySteps = [
+  {
+    title: 'Recepción',
+    text: 'Te damos la bienvenida, registramos tus datos y conocemos tus objetivos para empezar con una base clara.',
+    icon: ClipboardCheck
+  },
+  {
+    title: 'Presentación',
+    text: 'Te presentamos al profesor que será tu guía y referente durante todo tu proceso en el gimnasio.',
+    icon: Handshake
+  },
+  {
+    title: 'Rutina',
+    text: 'Durante las primeras semanas, el profesor te acompaña con una rutina de adaptación y corrige cada ejercicio.',
+    icon: Dumbbell
+  },
+  {
+    title: 'Plataforma',
+    text: 'Una vez que completás la adaptación, generamos tu rutina en la plataforma. Podés consultar tus datos en recepción.',
+    icon: Smartphone
+  }
+];
+
+const getWhatsAppHref = (sede) => {
+  const message = encodeURIComponent(`Hola, quiero hacer una consulta sobre la sede ${sede.nombre}.`);
+  const phone = sede.whatsapp.replace(/\D/g, '');
+
+  return phone
+    ? `https://wa.me/${phone}?text=${message}`
+    : `https://api.whatsapp.com/send?text=${message}`;
 };
 
 const Landing = () => {
+  const [selectedSede, setSelectedSede] = useState(null);
+  const [activeProfessorIndex, setActiveProfessorIndex] = useState(0);
+
+  useEffect(() => {
+    if (!selectedSede) return undefined;
+
+    const previousOverflow = document.body.style.overflow;
+    const professorCount = selectedSede.profesores.length;
+    document.body.style.overflow = 'hidden';
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') setSelectedSede(null);
+      if (event.key === 'ArrowLeft') {
+        setActiveProfessorIndex((current) => (current - 1 + professorCount) % professorCount);
+      }
+      if (event.key === 'ArrowRight') {
+        setActiveProfessorIndex((current) => (current + 1) % professorCount);
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [selectedSede]);
+
+  const openSede = (sede) => {
+    setActiveProfessorIndex(0);
+    setSelectedSede(sede);
+  };
+
+  const showPreviousProfessor = () => {
+    setActiveProfessorIndex((current) => (
+      current === 0 ? selectedSede.profesores.length - 1 : current - 1
+    ));
+  };
+
+  const showNextProfessor = () => {
+    setActiveProfessorIndex((current) => (
+      current === selectedSede.profesores.length - 1 ? 0 : current + 1
+    ));
+  };
+
+  const activeProfessor = selectedSede?.profesores[activeProfessorIndex];
+
   return (
-    <div style={{ minHeight: '100vh', display: 'flex', flexDirection: 'column' }}>
+    <div className="landing-page">
       <Navbar />
 
       <section id="inicio" className="hero landing-hero">
@@ -26,75 +115,47 @@ const Landing = () => {
 
         <div className="container hero-center">
           <div className="hero-badge">
-            <Sparkles size={16} /> Sistema de gestion multi-sede
+            <Sparkles size={16} /> Tu gimnasio, tu ritmo
           </div>
-          <h1 className="hero-title">
-            Entrena con seguimiento real en cada sede
-          </h1>
+          <h1 className="hero-title">ANIMA SANA &amp; CORPRE SANO</h1>
           <p className="hero-description">
-            AnimApp conecta profesores, recepcion, administracion y alumnos para que cada rutina tenga continuidad, datos claros y trabajo coordinado.
+            Empezá hoy, entrená a tu ritmo y descubrí todo lo que tu cuerpo puede lograr.
           </p>
           <div className="hero-actions">
-            <Link to="/login" className="btn-primary">
-              Plataforma AnimApp <ArrowRight size={18} />
-            </Link>
-            <a href="#sedes" className="btn-secondary">
-              Ver sedes
+            <a href="#sedes" className="btn-primary">
+              Ver sedes <MapPin size={18} />
             </a>
           </div>
         </div>
       </section>
 
-      <section id="metodologia" className="features-section">
+      <section id="metodologia" className="features-section methodology-section">
         <div className="container">
           <div className="section-header">
-            <span className="section-subtitle">Metodologia</span>
-            <h2 className="section-title">Cada rol trabaja con su panel</h2>
-            <p style={{ color: 'var(--text-muted)', maxWidth: '640px', margin: '0 auto' }}>
-              La plataforma separa permisos y responsabilidades para que cada sede pueda operar con orden.
+            <span className="section-subtitle">Metodología de trabajo</span>
+            <h2 className="section-title">Te acompañamos desde el primer día</h2>
+            <p className="section-description">
+              Un recorrido simple para que conozcas el gimnasio, entrenes con seguridad y avances con una rutina pensada para vos.
             </p>
           </div>
 
-          <div className="features-grid">
-            <div className="feature-card">
-              <div className="feature-icon">
-                <Shield size={28} />
-              </div>
-              <h3 className="feature-title">Administracion</h3>
-              <p className="feature-text">
-                Control global de sedes, staff, alumnos, rutinas activas y permisos por usuario.
-              </p>
-            </div>
+          <div className="methodology-flow">
+            {methodologySteps.map((step, index) => {
+              const StepIcon = step.icon;
 
-            <div className="feature-card">
-              <div className="feature-icon" style={{ background: 'rgba(87, 158, 224, 0.12)', color: 'var(--brand-200)' }}>
-                <Dumbbell size={28} />
-              </div>
-              <h3 className="feature-title">Profesores</h3>
-              <p className="feature-text">
-                Gestion de alumnos, ejercicios, semanas, dias de entrenamiento y evolucion.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon" style={{ background: 'rgba(76, 142, 203, 0.14)', color: 'var(--brand-300)' }}>
-                <Users size={28} />
-              </div>
-              <h3 className="feature-title">Recepcion</h3>
-              <p className="feature-text">
-                Inscripcion de alumnos y control de stock de limpieza con ingresos, egresos e historial.
-              </p>
-            </div>
-
-            <div className="feature-card">
-              <div className="feature-icon" style={{ background: 'rgba(46, 113, 179, 0.18)', color: 'var(--brand-100)' }}>
-                <Bot size={28} />
-              </div>
-              <h3 className="feature-title">Chatbot</h3>
-              <p className="feature-text">
-                Asistente para responder preguntas frecuentes sobre sedes, horarios, metodologia y servicios.
-              </p>
-            </div>
+              return (
+                <article className="methodology-step" key={step.title}>
+                  <div className="methodology-step-header">
+                    <span className="methodology-number">{String(index + 1).padStart(2, '0')}</span>
+                    <div className="feature-icon">
+                      <StepIcon size={27} />
+                    </div>
+                  </div>
+                  <h3 className="feature-title">{step.title}</h3>
+                  <p className="feature-text">{step.text}</p>
+                </article>
+              );
+            })}
           </div>
         </div>
       </section>
@@ -104,47 +165,182 @@ const Landing = () => {
           <div className="section-header">
             <span className="section-subtitle">Ubicaciones</span>
             <h2 className="section-title">Nuestras sedes</h2>
-            <p style={{ color: 'var(--text-muted)' }}>
-              Profesores y recepcionistas pueden trabajar en una o mas sedes segun su asignacion.
+            <p className="section-description">
+              Elegí una sede para conocer sus horarios, ubicación, profesores y vías de contacto.
             </p>
           </div>
 
           <div className="sedes-grid">
             {SEDES.map((sede, index) => (
-              <div className="sede-card" key={sede.id}>
+              <button
+                type="button"
+                className="sede-card"
+                key={sede.id}
+                style={{ '--sede-color': sede.color }}
+                onClick={() => openSede(sede)}
+                aria-label={`Ver información de la sede ${sede.nombre}`}
+              >
                 <div>
-                  <span className="sede-badge" style={{ color: sede.color }}>
-                    SEDE {String(index + 1).padStart(2, '0')} - {sede.nombre.toUpperCase()}
+                  <span className="sede-badge">
+                    SEDE {String(index + 1).padStart(2, '0')} · {sede.nombre.toUpperCase()}
                   </span>
-                  <h3 style={{ fontSize: '1.5rem', marginBottom: '0.8rem' }}>AnimApp {sede.nombre}</h3>
-                  <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '1.5rem' }}>
-                    {sedeHighlights[sede.id]}
-                  </p>
+                  <h3>AnimApp {sede.nombre}</h3>
+                  <p>{sede.resumen}</p>
                 </div>
-                <div style={{ borderTop: '1px solid var(--border-color)', paddingTop: '1rem', display: 'flex', justifyContent: 'space-between', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                  <span>Atencion personalizada</span>
-                  <span style={{ color: 'var(--accent-orange)' }}>Operativa</span>
+                <div className="sede-card-footer">
+                  <span>Ver información</span>
+                  <ArrowRight size={19} aria-hidden="true" />
                 </div>
-              </div>
+              </button>
             ))}
           </div>
         </div>
       </section>
 
-      <section style={{ background: 'linear-gradient(135deg, #0b1d33 0%, #102a47 100%)', padding: '5rem 0', borderTop: '1px solid var(--border-color)', borderBottom: '1px solid var(--border-color)' }}>
-        <div className="container" style={{ textAlign: 'center', maxWidth: '750px' }}>
-          <Lock size={40} color="var(--accent-orange)" style={{ marginBottom: '1rem' }} />
-          <h2 style={{ fontSize: '2.4rem', marginBottom: '1rem' }}>Acceso exclusivo a plataforma</h2>
-          <p style={{ color: 'var(--text-muted)', marginBottom: '2rem', fontSize: '1.1rem' }}>
-            Ingrese para gestionar alumnos, rutinas, staff y stock por sede.
-          </p>
-          <Link to="/login" className="btn-primary" style={{ padding: '0.9rem 2.2rem', fontSize: '1.1rem' }}>
+      <section className="platform-access-section">
+        <div className="container platform-access-content">
+          <Lock size={40} color="var(--accent-orange)" />
+          <h2>Acceso exclusivo a plataforma</h2>
+          <p>Ingresá para gestionar alumnos, rutinas, staff y stock por sede.</p>
+          <Link to="/login" className="btn-primary platform-access-button">
             Plataforma AnimApp <ArrowRight size={20} />
           </Link>
         </div>
       </section>
 
       <Footer />
+
+      {selectedSede && activeProfessor && (
+        <div
+          className="sede-modal-backdrop"
+          role="presentation"
+          onMouseDown={(event) => {
+            if (event.target === event.currentTarget) setSelectedSede(null);
+          }}
+        >
+          <section
+            className="sede-modal"
+            role="dialog"
+            aria-modal="true"
+            aria-labelledby="sede-modal-title"
+          >
+            <button
+              type="button"
+              className="sede-modal-close"
+              onClick={() => setSelectedSede(null)}
+              aria-label="Cerrar información de la sede"
+              title="Cerrar"
+            >
+              <X size={22} />
+            </button>
+
+            <div className="sede-modal-scroll">
+              <div className="sede-modal-hero">
+                {selectedSede.foto ? (
+                  <img src={selectedSede.foto} alt={`Interior de la sede ${selectedSede.nombre}`} />
+                ) : (
+                  <div className="media-placeholder sede-photo-placeholder">
+                    <ImageIcon size={38} aria-hidden="true" />
+                    <span>Foto de la sede</span>
+                  </div>
+                )}
+                <div className="sede-modal-heading">
+                  <span className="section-subtitle">AnimApp {selectedSede.nombre}</span>
+                  <h2 id="sede-modal-title">Conocé la sede</h2>
+                  <p>{selectedSede.resumen}</p>
+                </div>
+              </div>
+
+              <div className="sede-info-grid">
+                <div className="sede-info-item">
+                  <Clock3 size={23} aria-hidden="true" />
+                  <div>
+                    <span>Horarios</span>
+                    {selectedSede.horarios.map((horario) => <p key={horario}>{horario}</p>)}
+                  </div>
+                </div>
+                <div className="sede-info-item">
+                  <MapPin size={23} aria-hidden="true" />
+                  <div>
+                    <span>Ubicación</span>
+                    <p>{selectedSede.direccion}</p>
+                  </div>
+                </div>
+              </div>
+
+              <div className="professors-section">
+                <div className="professors-heading">
+                  <div>
+                    <span className="section-subtitle">Equipo</span>
+                    <h3>Profesores de la sede</h3>
+                  </div>
+                  <span>{activeProfessorIndex + 1} / {selectedSede.profesores.length}</span>
+                </div>
+
+                <div className="professor-carousel" aria-live="polite">
+                  <button
+                    type="button"
+                    className="carousel-control"
+                    onClick={showPreviousProfessor}
+                    aria-label="Profesor anterior"
+                    title="Anterior"
+                  >
+                    <ChevronLeft size={23} />
+                  </button>
+
+                  <article className="professor-card" key={activeProfessor.id}>
+                    {activeProfessor.foto ? (
+                      <img src={activeProfessor.foto} alt={activeProfessor.nombre} />
+                    ) : (
+                      <div className="media-placeholder professor-photo-placeholder">
+                        <UserRound size={42} aria-hidden="true" />
+                        <span>Foto del profesor</span>
+                      </div>
+                    )}
+                    <div className="professor-details">
+                      <h4>{activeProfessor.nombre}</h4>
+                      <p>{activeProfessor.horario}</p>
+                    </div>
+                  </article>
+
+                  <button
+                    type="button"
+                    className="carousel-control"
+                    onClick={showNextProfessor}
+                    aria-label="Profesor siguiente"
+                    title="Siguiente"
+                  >
+                    <ChevronRight size={23} />
+                  </button>
+                </div>
+
+                <div className="carousel-dots" aria-label="Seleccionar profesor">
+                  {selectedSede.profesores.map((profesor, index) => (
+                    <button
+                      type="button"
+                      key={profesor.id}
+                      className={index === activeProfessorIndex ? 'carousel-dot active' : 'carousel-dot'}
+                      onClick={() => setActiveProfessorIndex(index)}
+                      aria-label={`Ver a ${profesor.nombre}`}
+                      aria-pressed={index === activeProfessorIndex}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              <a
+                className="whatsapp-button"
+                href={getWhatsAppHref(selectedSede)}
+                target="_blank"
+                rel="noreferrer"
+              >
+                <MessageCircle size={21} />
+                Consultar por WhatsApp
+              </a>
+            </div>
+          </section>
+        </div>
+      )}
     </div>
   );
 };
