@@ -1,5 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { addDoc, collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where } from 'firebase/firestore';
+import { deleteApp, initializeApp } from 'firebase/app';
+import { createUserWithEmailAndPassword, deleteUser, getAuth } from 'firebase/auth';
+import { collection, deleteDoc, doc, onSnapshot, query, serverTimestamp, setDoc, updateDoc, where, writeBatch } from 'firebase/firestore';
 import { Check, Edit3, Home, LogOut, Package, Search, Trash2, UserCheck, UserPlus, UserRound, Users, X } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import SedeSwitcher from '../components/SedeSwitcher';
@@ -9,7 +11,7 @@ import { db } from '../firebase/config';
 const EMPTY_STUDENT = {
   nombre: '', dni: '', fechaNacimiento: '', email: '', telefono: '', direccion: '',
   fechaIngreso: new Date().toISOString().slice(0, 10), profesorAsignado: 'Sin asignar',
-  profesorId: '', activo: true, observaciones: ''
+  profesorId: '', activo: true, observaciones: '', password: ''
 };
 
 const getInitials = (name = '') => name.split(' ').filter(Boolean).slice(0, 2)
@@ -22,7 +24,7 @@ const getFirebaseError = (error, fallback) => {
 };
 
 const RecepcionDashboard = () => {
-  const { activeSede, logout, userProfile } = useAuth();
+  const { activeSede, firebaseOptions, logout, userProfile } = useAuth();
   const navigate = useNavigate();
   const [students, setStudents] = useState([]);
   const [searchTerm, setSearchTerm] = useState('');
@@ -197,9 +199,14 @@ const RecepcionDashboard = () => {
       setError('Ya existe un alumno con ese DNI en esta sede.');
       return;
     }
+    const normalizedEmail = studentForm.email.trim().toLocaleLowerCase('es');
+    if (!editingStudent && !normalizedEmail) {
+      setError('Ingresá un correo para crear la cuenta de acceso del alumno.');
+      return;
+    }
     const payload = {
       nombre: studentForm.nombre.trim(), dni: normalizedDni,
-      fechaNacimiento: studentForm.fechaNacimiento, email: studentForm.email.trim().toLocaleLowerCase('es'),
+      fechaNacimiento: studentForm.fechaNacimiento, email: normalizedEmail,
       telefono: studentForm.telefono.trim(), direccion: studentForm.direccion.trim(),
       fechaIngreso: studentForm.fechaIngreso,
       profesorId: studentForm.profesorId,
@@ -212,17 +219,68 @@ const RecepcionDashboard = () => {
     setError('');
     try {
       if (editingStudent) {
-        await updateDoc(doc(db, 'alumnos', editingStudent.id), payload);
+        if (editingStudent.userId) {
+          const batch = writeBatch(db);
+          batch.update(doc(db, 'alumnos', editingStudent.id), payload);
+          batch.update(doc(db, 'users', editingStudent.userId), {
+            activo: payload.activo,
+            active: payload.activo,
+            eliminado: !payload.activo,
+            updatedAt: serverTimestamp()
+          });
+          await batch.commit();
+        } else {
+          await updateDoc(doc(db, 'alumnos', editingStudent.id), payload);
+        }
         setFeedback('Los datos del alumno se actualizaron correctamente.');
       } else {
-        await addDoc(collection(db, 'alumnos'), { ...payload, createdAt: serverTimestamp(), createdBy: userProfile?.uid || '' });
-        setFeedback('El alumno quedó registrado en la sede.');
+        const secondaryApp = initializeApp(firebaseOptions, `reception-create-${Date.now()}`);
+        const secondaryAuth = getAuth(secondaryApp);
+        let createdUser = null;
+        try {
+          const credential = await createUserWithEmailAndPassword(secondaryAuth, normalizedEmail, studentForm.password);
+          createdUser = credential.user;
+          const batch = writeBatch(db);
+          batch.set(doc(db, 'users', createdUser.uid), {
+            uid: createdUser.uid,
+            nombre: payload.nombre,
+            email: normalizedEmail,
+            telefono: payload.telefono,
+            rol: 'alumno',
+            role: 'alumno',
+            sedes: [activeSedeId],
+            sedeIds: [activeSedeId],
+            activo: payload.activo,
+            active: payload.activo,
+            eliminado: false,
+            createdAt: serverTimestamp(),
+            updatedAt: serverTimestamp()
+          });
+          batch.set(doc(db, 'alumnos', createdUser.uid), {
+            ...payload,
+            userId: createdUser.uid,
+            createdAt: serverTimestamp(),
+            createdBy: userProfile?.uid || ''
+          });
+          await batch.commit();
+        } catch (firebaseError) {
+          if (createdUser) await deleteUser(createdUser).catch(() => undefined);
+          throw firebaseError;
+        } finally {
+          await deleteApp(secondaryApp);
+        }
+        setFeedback('El alumno quedó registrado y ya puede iniciar sesión.');
       }
       setIsFormOpen(false);
       setEditingStudent(null);
     } catch (firebaseError) {
       console.error('Error al guardar alumno:', firebaseError);
-      setError(getFirebaseError(firebaseError, 'No pudimos guardar el alumno. Revisá los datos e intentá nuevamente.'));
+      const fallback = firebaseError.code === 'auth/email-already-in-use'
+        ? 'Ese correo ya tiene una cuenta registrada.'
+        : firebaseError.code === 'auth/weak-password'
+          ? 'La contraseña debe tener al menos 6 caracteres.'
+          : 'No pudimos guardar el alumno. Revisá los datos e intentá nuevamente.';
+      setError(getFirebaseError(firebaseError, fallback));
     } finally {
       setIsSaving(false);
     }
@@ -233,8 +291,25 @@ const RecepcionDashboard = () => {
     setIsSaving(true);
     setError('');
     try {
-      await deleteDoc(doc(db, 'alumnos', studentToDelete.id));
-      setFeedback(`${studentToDelete.nombre} fue eliminado de la sede.`);
+      if (studentToDelete.userId) {
+        const batch = writeBatch(db);
+        batch.update(doc(db, 'alumnos', studentToDelete.id), {
+          activo: false,
+          updatedAt: serverTimestamp(),
+          updatedBy: userProfile?.uid || ''
+        });
+        batch.update(doc(db, 'users', studentToDelete.userId), {
+          activo: false,
+          active: false,
+          eliminado: true,
+          updatedAt: serverTimestamp()
+        });
+        await batch.commit();
+        setFeedback(`${studentToDelete.nombre} fue desactivado y ya no puede iniciar sesión.`);
+      } else {
+        await deleteDoc(doc(db, 'alumnos', studentToDelete.id));
+        setFeedback(`${studentToDelete.nombre} fue eliminado de la sede.`);
+      }
       setStudentToDelete(null);
     } catch (firebaseError) {
       console.error('Error al eliminar alumno:', firebaseError);
@@ -280,7 +355,8 @@ const RecepcionDashboard = () => {
         <label className="wide"><span>Nombre y apellido *</span><input type="text" value={studentForm.nombre} onChange={(event) => setStudentForm({ ...studentForm, nombre: event.target.value })} required autoFocus /></label>
         <label><span>DNI *</span><input type="text" inputMode="numeric" pattern="[0-9. ]{7,12}" value={studentForm.dni} onChange={(event) => setStudentForm({ ...studentForm, dni: event.target.value })} placeholder="Sin puntos" required /></label>
         <label><span>Fecha de nacimiento</span><input type="date" value={studentForm.fechaNacimiento} onChange={(event) => setStudentForm({ ...studentForm, fechaNacimiento: event.target.value })} /></label>
-        <label><span>Correo electrónico</span><input type="email" value={studentForm.email} onChange={(event) => setStudentForm({ ...studentForm, email: event.target.value })} placeholder="nombre@email.com" /></label>
+        <label><span>Correo electrónico *</span><input type="email" value={studentForm.email} onChange={(event) => setStudentForm({ ...studentForm, email: event.target.value })} placeholder="nombre@email.com" disabled={Boolean(editingStudent?.userId)} required />{editingStudent?.userId && <small>Es el correo de acceso y no puede cambiarse sin el servicio seguro de cuentas.</small>}</label>
+        {!editingStudent && <label><span>Contraseña temporal *</span><input type="password" value={studentForm.password} onChange={(event) => setStudentForm({ ...studentForm, password: event.target.value })} minLength="6" placeholder="Mínimo 6 caracteres" required /><small>Compartila de forma privada con el alumno.</small></label>}
         <label><span>Teléfono *</span><input type="tel" value={studentForm.telefono} onChange={(event) => setStudentForm({ ...studentForm, telefono: event.target.value })} required /></label>
         <label className="wide"><span>Dirección</span><input type="text" value={studentForm.direccion} onChange={(event) => setStudentForm({ ...studentForm, direccion: event.target.value })} /></label>
         <label><span>Fecha de ingreso *</span><input type="date" value={studentForm.fechaIngreso} onChange={(event) => setStudentForm({ ...studentForm, fechaIngreso: event.target.value })} required /></label>

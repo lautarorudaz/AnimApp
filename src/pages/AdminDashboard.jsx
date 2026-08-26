@@ -2,7 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { deleteApp, initializeApp } from 'firebase/app';
 import { createUserWithEmailAndPassword, deleteUser, getAuth } from 'firebase/auth';
-import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc } from 'firebase/firestore';
+import { collection, deleteDoc, doc, onSnapshot, serverTimestamp, setDoc, updateDoc, writeBatch } from 'firebase/firestore';
 import {
   Building2,
   Check,
@@ -302,13 +302,14 @@ const AdminDashboard = () => {
             updatedBy: userProfile?.uid || ''
           });
         } else {
-          await updateDoc(doc(db, 'users', editingPerson.id), {
+          const batch = writeBatch(db);
+          batch.update(doc(db, 'users', editingPerson.id), {
             ...normalizedPerson,
             updatedAt: serverTimestamp()
           });
 
           if (normalizedPerson.rol === ROLES.ALUMNO) {
-            await setDoc(doc(db, 'alumnos', editingPerson.studentRecordId || editingPerson.id), {
+            batch.set(doc(db, 'alumnos', editingPerson.studentRecordId || editingPerson.id), {
               userId: editingPerson.id,
               nombre: normalizedPerson.nombre,
               email: normalizedPerson.email,
@@ -319,8 +320,9 @@ const AdminDashboard = () => {
               updatedBy: userProfile?.uid || ''
             }, { merge: true });
           } else if (editingPerson.rol === ROLES.ALUMNO) {
-            await deleteDoc(doc(db, 'alumnos', editingPerson.studentRecordId || editingPerson.id));
+            batch.delete(doc(db, 'alumnos', editingPerson.studentRecordId || editingPerson.id));
           }
+          await batch.commit();
         }
         setFeedback('Los cambios se guardaron correctamente.');
       } else {
@@ -335,7 +337,8 @@ const AdminDashboard = () => {
             personForm.password
           );
           createdUser = credential.user;
-          await setDoc(doc(db, 'users', createdUser.uid), {
+          const batch = writeBatch(db);
+          batch.set(doc(db, 'users', createdUser.uid), {
             ...normalizedPerson,
             uid: createdUser.uid,
             createdAt: serverTimestamp(),
@@ -343,7 +346,7 @@ const AdminDashboard = () => {
           });
 
           if (normalizedPerson.rol === ROLES.ALUMNO) {
-            await setDoc(doc(db, 'alumnos', createdUser.uid), {
+            batch.set(doc(db, 'alumnos', createdUser.uid), {
               userId: createdUser.uid,
               nombre: normalizedPerson.nombre,
               dni: '',
@@ -362,6 +365,7 @@ const AdminDashboard = () => {
               createdBy: userProfile?.uid || ''
             });
           }
+          await batch.commit();
         } catch (error) {
           if (createdUser) {
             await Promise.allSettled([
@@ -402,19 +406,21 @@ const AdminDashboard = () => {
         setPersonToDelete(null);
         return;
       }
-      await updateDoc(doc(db, 'users', person.id), {
+      const batch = writeBatch(db);
+      batch.update(doc(db, 'users', person.id), {
         activo: false,
         active: false,
         eliminado: true,
         updatedAt: serverTimestamp()
       });
       if (person.rol === ROLES.ALUMNO) {
-        await setDoc(doc(db, 'alumnos', person.studentRecordId || person.id), {
+        batch.set(doc(db, 'alumnos', person.studentRecordId || person.id), {
           activo: false,
           updatedAt: serverTimestamp(),
           updatedBy: userProfile?.uid || ''
         }, { merge: true });
       }
+      await batch.commit();
       setFeedback(`${person.nombre} fue eliminado y ya no puede iniciar sesión.`);
       setPersonToDelete(null);
     } catch (error) {

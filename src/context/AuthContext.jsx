@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { doc, getDoc, setDoc } from 'firebase/firestore';
-import { auth, db } from '../firebase/config';
+import { app, auth, db } from '../firebase/config';
 import { ROLES, SEDE_IDS, SEDES, getRoleHomePath, normalizeSedeIds } from '../constants/appData';
 import { AuthContext } from './auth';
 const ACTIVE_SEDE_STORAGE_KEY = 'animapp.activeSedeId';
@@ -167,6 +167,7 @@ export const AuthProvider = ({ children }) => {
     login,
     logout,
     saveUserRoleProfile,
+    firebaseOptions: app.options,
     setActiveSedeId,
     loading
   };

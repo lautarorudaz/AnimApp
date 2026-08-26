@@ -17,7 +17,7 @@ if (missingFirebaseConfig) {
   console.warn('Faltan variables VITE_FIREBASE_* para conectar Firebase.');
 }
 
-const app = initializeApp(firebaseConfig);
+export const app = initializeApp(firebaseConfig);
 
 export const auth = getAuth(app);
 export const db = getFirestore(app);

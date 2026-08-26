@@ -41,17 +41,20 @@ service cloud.firestore {
         );
     }
 
-    function isStaffForSede(sedeId) {
-      return profileHasSede(sedeId)
-        && (profile().rol in ['profesor', 'recepcionista']);
-    }
-
     function isProfesorForSede(sedeId) {
       return profileHasSede(sedeId) && hasRole('profesor');
     }
 
     function isRecepcionForSede(sedeId) {
       return profileHasSede(sedeId) && hasRole('recepcionista');
+    }
+
+    function isAssignedProfessor(alumnoId, sedeId) {
+      let alumnoPath = /databases/$(database)/documents/alumnos/$(alumnoId);
+      return isProfesorForSede(sedeId)
+        && exists(alumnoPath)
+        && get(alumnoPath).data.sedeId == sedeId
+        && get(alumnoPath).data.profesorId == request.auth.uid;
     }
 
     match /sedes/{sedeId} {
@@ -68,7 +71,25 @@ service cloud.firestore {
           && resource.data.activo == true
           && resource.data.sedeIds.hasAny(profile().sedeIds)
         );
-      allow create, update, delete: if isAdmin();
+      allow create: if isAdmin()
+        || (
+          hasRole('recepcionista')
+          && request.resource.data.uid == userId
+          && request.resource.data.rol == 'alumno'
+          && request.resource.data.sedeIds.size() == 1
+          && request.resource.data.sedeIds.hasAny(profile().sedeIds)
+        );
+
+      allow update: if isAdmin()
+        || (
+          hasRole('recepcionista')
+          && resource.data.rol == 'alumno'
+          && resource.data.sedeIds.hasAny(profile().sedeIds)
+          && request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['activo', 'active', 'eliminado', 'updatedAt'])
+        );
+
+      allow delete: if isAdmin();
     }
 
     match /alumnos/{alumnoId} {
@@ -80,9 +101,9 @@ service cloud.firestore {
           && resource.data.profesorId == request.auth.uid
         );
 
-      allow create: if isAdmin() || isStaffForSede(request.resource.data.sedeId);
+      allow create: if isAdmin() || isRecepcionForSede(request.resource.data.sedeId);
 
-      allow update, delete: if isAdmin()
+      allow update: if isAdmin()
         || (
           isRecepcionForSede(resource.data.sedeId)
           && request.resource.data.sedeId == resource.data.sedeId
@@ -92,26 +113,97 @@ service cloud.firestore {
           && resource.data.profesorId == request.auth.uid
           && request.resource.data.sedeId == resource.data.sedeId
           && request.resource.data.profesorId == resource.data.profesorId
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'rutinaId', 'rutinaNombre', 'objetivo', 'frecuenciaSemanal',
+            'rutinaIndicaciones', 'rutinaEjercicios', 'rutinaActualizadaAt',
+            'rutinaEstructura', 'updatedAt', 'updatedBy'
+          ])
         );
+
+      allow delete: if isAdmin() || isRecepcionForSede(resource.data.sedeId);
     }
 
     match /ejercicios/{ejercicioId} {
+      allow read: if isAdmin()
+        || (
+          hasRole('profesor')
+          && (resource.data.privado == false || resource.data.profesorId == request.auth.uid)
+        );
+
+      allow create: if isAdmin()
+        || (
+          hasRole('profesor')
+          && request.resource.data.profesorId == request.auth.uid
+        );
+
+      allow update: if isAdmin()
+        || (
+          hasRole('profesor')
+          && resource.data.profesorId == request.auth.uid
+          && request.resource.data.profesorId == request.auth.uid
+        );
+
+      allow delete: if isAdmin()
+        || (hasRole('profesor') && resource.data.profesorId == request.auth.uid);
+    }
+
+    match /zonasMusculares/{zonaId} {
       allow read: if isActive();
-      allow create, update, delete: if isAdmin() || hasRole('profesor');
+      allow create: if hasRole('profesor')
+        && request.resource.data.creadoPor == request.auth.uid;
+      allow update, delete: if isAdmin()
+        || (hasRole('profesor') && resource.data.creadoPor == request.auth.uid);
     }
 
     match /rutinas/{rutinaId} {
       allow read: if isAdmin()
         || (signedIn() && request.auth.uid == resource.data.alumnoUserId)
-        || isProfesorForSede(resource.data.sedeId);
-
-      allow create: if isAdmin() || isProfesorForSede(request.resource.data.sedeId);
-
-      allow update, delete: if isAdmin()
         || (
-          isProfesorForSede(resource.data.sedeId)
-          && request.resource.data.sedeId == resource.data.sedeId
+          resource.data.profesorId == request.auth.uid
+          && isAssignedProfessor(resource.data.alumnoId, resource.data.sedeId)
         );
+
+      allow create: if isAdmin()
+        || (
+          request.resource.data.profesorId == request.auth.uid
+          && isAssignedProfessor(request.resource.data.alumnoId, request.resource.data.sedeId)
+        );
+
+      allow update: if isAdmin()
+        || (
+          resource.data.profesorId == request.auth.uid
+          && request.resource.data.profesorId == request.auth.uid
+          && request.resource.data.alumnoId == resource.data.alumnoId
+          && request.resource.data.sedeId == resource.data.sedeId
+          && isAssignedProfessor(resource.data.alumnoId, resource.data.sedeId)
+        );
+
+      allow delete: if isAdmin()
+        || (
+          resource.data.profesorId == request.auth.uid
+          && isAssignedProfessor(resource.data.alumnoId, resource.data.sedeId)
+        );
+    }
+
+    match /rutinasGenericas/{rutinaId} {
+      allow read: if isAdmin()
+        || (hasRole('profesor') && resource.data.profesorId == request.auth.uid);
+
+      allow create: if isAdmin()
+        || (
+          hasRole('profesor')
+          && request.resource.data.profesorId == request.auth.uid
+        );
+
+      allow update: if isAdmin()
+        || (
+          hasRole('profesor')
+          && resource.data.profesorId == request.auth.uid
+          && request.resource.data.profesorId == request.auth.uid
+        );
+
+      allow delete: if isAdmin()
+        || (hasRole('profesor') && resource.data.profesorId == request.auth.uid);
     }
 
     match /stockItems/{itemId} {
