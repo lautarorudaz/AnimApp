@@ -1,0 +1,687 @@
+ANIMAPP — FB-001: CONTRATOS Y DECISIONES DE ARQUITECTURA
+DOCUMENTO DE CIERRE TÉCNICO PARA EL EQUIPO
+Versión: 1.1 (R3 operativa) | Fecha: 13/11/2026 | Proyecto: TFI - Gimnasio Anima
+Integrantes: Juan Pablo Lenain, Ulises Agustín Rudaz y Lautaro Martín Rudaz
+Estado: FB-001 CERRADA A NIVEL DE DEFINICIÓN TÉCNICA (ver alcance del cierre)
+
+===============================================================================
+0. QUÉ SIGNIFICA «FB-001 CERRADA»
+===============================================================================
+
+Quedan fijadas en este documento las decisiones necesarias para que los tres integrantes
+puedan implementar sus módulos sin tener que rediseñar el dominio ni adivinar estructuras
+de datos: arquitectura, entidades canónicas, permisos, estados de las rutinas, contratos
+entre módulos, errores, responsables y criterios de aceptación.
+
+Este cierre ES UNA DECISIÓN TÉCNICA DE TRABAJO formulada en el marco de la solicitud
+del equipo. No significa que el software ya implemente esos contratos, que estén
+probados los 16 RF, ni que se haya recibido una aprobación formal de la cátedra.
+La ratificación por los otros integrantes y el acuerdo académico sobre el cambio
+Express/SQL -> Firebase BaaS son gestiones externas y deben registrarse por separado.
+La falta de esa ratificación no obliga a rediseñar nuevamente FB-001: este documento
+sirve como línea de base para revisión y para comenzar desarrollo aislado.
+
+Alcance verificado para elaborar la especificación:
+- ZIP del repositorio AnimApp, versión de código previa a FB-003 (código de React,
+  componentes, reglas Firestore, archivos de configuración y constantes).
+- Documento académico «Idea Proyecto TFI» aportado por el equipo.
+- Auditoría técnica y Plan de Finalización R2 íntegros de Codex (33 tareas),
+  recibidos luego de la versión 1.0 y utilizados para ajustar propiedad/dependencias.
+- Decisión R3 comunicada por el equipo el 13/11/2026: se PRESCINDE de FB-002/003
+  como modalidad compartida; GitHub se trabaja directamente en main. FB-003 fue
+  implementada y probada previamente en una copia local, pero NO se adopta para
+  el trabajo compartido. No hay verificación de que esté en GitHub ni se debe
+  mezclar inadvertidamente con commits posteriores.
+- Esta revisión NO ejecutó código, no auditó el HEAD actual de GitHub ni consultó
+  Firebase remoto. La evidencia funcional sigue limitada a la auditoría R2.
+
+Esta tarea no introduce código ni actualiza el repositorio. Todas las referencias
+a funciones, esquemas o rutas «nuevas» a continuación son contratos a implementar.
+
+===============================================================================
+1. DECISIÓN DE ARQUITECTURA (ADR-001)
+===============================================================================
+
+DECISIÓN: Mantener Firebase como Backend as a Service, sin API REST Express general.
+
+Arquitectura objetivo:
+  [React + Vite]
+        |-- Firebase Web SDK --> Authentication / Firestore
+        |                         (lecturas y CRUD simples, bajo Security Rules)
+        |-- Firebase callable --> Cloud Functions
+                                  (altas administrativas, cambios privilegiados,
+                                   transiciones de rutinas e IA)
+                                  |-- Firebase Admin SDK --> Auth / Firestore
+                                  |-- proveedor de IA con secreto del servidor
+
+Reglas de arquitectura:
+A1. React muestra datos y solicita operaciones; ocultar botones NO autoriza accesos.
+A2. `users/{uid}` es fuente confiable para rol/estado/sedes, evaluada en Rules y,
+    cuando corresponda, de nuevo por las Functions en cada operación.
+A3. Los CRUD simples y lecturas privadas continúan con Web SDK cuando las Rules
+    puedan aplicar con seguridad las restricciones y la consulta sea compatible.
+A4. Las cuentas creadas por personal, cambios privilegiados de identidad/rol/sede
+    y operaciones de rutinas que cambian estados pasan por callable Functions.
+A5. Las escrituras directas del navegador en `rutinas` y en el puntero activo del
+    alumno quedan prohibidas. La lectura de rutinas se realiza por Web SDK seguro.
+A6. Functions con Admin SDK NO se protegen por las Rules: requieren autorización
+    explícita y transacciones/validación en sus servicios.
+A7. Solo dos sucursales canónicas: `moreno` y `edison` (Av. Moreno 1020 y Av.
+    Edison 46). La tercera sede estática del código no entra en el alcance oficial.
+    No se elimina ningún dato existente sin auditoría/migración aprobada.
+A8. Los patrones comprometidos se acreditan en código y pruebas: State gobierna
+    el ciclo de vida de rutinas; Protection Proxy verifica autorización y delega
+    a operaciones privilegiadas. `ProtectedRoute` es solo protección de interfaz.
+A9. El equipo no usará emuladores ni FB-002/003 como requisito de desarrollo.
+    Se autorizan pruebas unitarias con dobles/fixtures sintéticos sin red.
+    NUNCA confundir una prueba simulada con verificación real de Rules, Auth,
+    transacciones, latencia o seguridad. Las pruebas remotas requieren un
+    procedimiento explícito de alcance mínimo y autorización del equipo.
+    No usar `animappv1` para seed/reset, borrados masivos, migraciones ni
+    pruebas destructivas. No se despliega ni se habilita facturación por un commit.
+A10. No se implementan pagos, stock, subida de vídeos ni generación de rutinas
+    por IA como obligaciones del TFI.
+
+Resultado: se conserva el frontend actual y Firebase. Se reemplazan únicamente las
+rutas de persistencia o administración que vulneran invariantes o permisos.
+
+CONSECUENCIA ACADÉMICA: la Idea Proyecto consignaba Node+Express, API REST y una
+«base de datos relacional». Firestore es documental/NoSQL. La divergencia DEBE
+presentarse para conformidad docente; no se declara aprobada.
+
+===============================================================================
+2. MODELO CANÓNICO DE DATOS (ADR-002)
+===============================================================================
+
+Convenciones comunes:
+- Todo usuario autenticado se identifica exclusivamente por `auth.uid` de Firebase.
+- Los documentos nuevos de `users/{uid}` y `alumnos/{uid}` emplean ese mismo UID.
+- Los identificadores y relaciones se validan del lado confiable, no por nombre.
+- Las fechas de auditoría usan timestamps del servidor y no fechas del navegador.
+- No se confía en `role`, `active`, `sedes` ni en otras copias heredadas al autorizar.
+- Los documentos viejos se migran mediante procedimiento explícito de solo lectura
+  inicial (dry-run) y migración reversible/autorizada. Nunca por listeners al abrir UI.
+- Los esquemas siguientes son contratos destino, NO descripción de datos ya migrados.
+
+2.1. users/{uid} — identidad y permisos (fuente canónica)
+
+{
+  uid: string,                // debe coincidir con ID de documento y Auth UID
+  nombre: string,
+  email: string,              // coincidente con Auth; cambios de email centralizados
+  telefono: string,
+  rol: 'admin' | 'recepcionista' | 'profesor' | 'alumno',
+  sedeIds: string[],         // sedes autorizadas: 'moreno' y/o 'edison'
+  activo: boolean,
+  createdAt: Timestamp,
+  updatedAt: Timestamp
+}
+
+Invariantes:
+- Admin: acceso organizacional global; `sedeIds` puede ser [], no limita su alcance.
+- Recepcionista: exactamente una sede operativa; no puede gestionar otra.
+- Alumno: exactamente una sede, igual a `alumnos/{uid}.sedeId`.
+- Profesor: una o dos sedes; acceder a una NO concede acceso a todos sus alumnos,
+  solamente a los asignados explícitamente.
+- Los alias antiguos (`role`, `active`, `sedes`, `sede`) se aceptan solo durante
+  migración/lectura de compatibilidad; NO como fuente alternativa de permisos.
+- El cambio de rol/sede/estado es privilegiado: no se hace con Web SDK libre.
+- Inactivar NO es borrar. No reutilizar `eliminado` como sinónimo de `activo=false`.
+
+2.2. alumnos/{uid} — ficha y asignación
+
+{
+  userId: string,            // igual a UID e ID documento
+  sedeId: 'moreno' | 'edison',
+  profesorId: string | null, // UID del profesor ACTUAL, null = sin asignar
+  dni: string,               // si se solicita, dato privado; NO clave de documento
+  fechaNacimiento: string | null,
+  fechaIngreso: string,
+  direccion: string,
+  observaciones: string,
+  rutinaActivaId: string | null,
+  createdAt: Timestamp,
+  updatedAt: Timestamp,
+  updatedBy: string
+}
+
+Fuentes de verdad:
+- `users`: nombre, email, telefono, rol, activo y sedes autorizadas.
+- `alumnos`: sede operativa del alumno, profesor asignado y datos específicos.
+- `rutinas`: contenido completo de cada rutina y su historial.
+- `alumnos.rutinaActivaId`: puntero a la ÚNICA rutina activa.
+
+No seguir almacenando `rutinaEstructura`, `rutinaNombre`, `rutinaId` y copias del
+contenido como otra fuente editable. Sus datos legacy se leen únicamente para
+migración compatible. La UI compone perfil y ficha mediante un servicio común.
+Si no existe ficha para un alumno de Auth, se informa inconsistencia; no se crea
+ni sobrescribe automáticamente desde un listener.
+
+2.3. rutinas/{rutinaId} — una identidad por rutina asignada
+
+{
+  alumnoId: string,          // UID inmutable del alumno
+  sedeId: string,            // sede al momento de la asignación (snapshot)
+  autorId: string,           // profesor que originalmente creó la rutina
+  estado: 'activa' | 'historica',
+  version: integer >= 1,
+  nombre: string,
+  objetivo: string,
+  semanas: [
+    { id: string, nombre: string, dias: [
+      { id: string, nombre: string,
+        etapas: {
+          'Movilidad': [EjercicioSnapshot],
+          'Activación': [EjercicioSnapshot],
+          'Central': [EjercicioSnapshot]
+        }
+      }
+    ] }
+  ],
+  plantillaOrigenId: string | null,
+  createdAt: Timestamp,
+  updatedAt: Timestamp,
+  archivedAt: Timestamp | null
+}
+
+EjercicioSnapshot = {
+  id: string, ejercicioId: string | null, nombre: string,
+  zonaMuscular: string, series: string, repeticiones: string,
+  peso: string, observacion: string
+}
+
+- Las etapas y `observacion` respetan los nombres usados por `RoutineWorkspace`.
+- Series/repeticiones/peso se mantienen como strings para compatibilidad con el
+  editor actual; validar formato, longitudes y magnitudes, no aceptar arbitrarios.
+- Las rutinas almacenan snapshots; modificar un ejercicio de biblioteca NO
+  modifica retroactivamente rutinas ya asignadas.
+- Una histórica no puede modificarse, reactivarse ni borrarse en operaciones normales.
+- El permiso del profesor se deriva de la asignación ACTUAL del alumno, no de
+  `autorId` ni del `sedeId` histórico.
+- `rutinas/{alumnoId}` existente se trata como legacy; NO sobrescribirlo más.
+
+2.4. Colecciones que conservamos
+
+- `ejercicios`: CRUD de biblioteca con propiedad del profesor y visibilidad;
+  snapshots inmutables al incorporarlos a una rutina.
+- `rutinasGenericas`: plantillas del profesor, distintas de rutinas asignadas.
+- `zonasMusculares`: categorías; mantener validación/autoría.
+- `stockItems` / `stockMovimientos`: fuera del alcance de los 16 RF; no ampliarlos.
+
+2.5. Información institucional pública
+
+Documento canónico recomendado: `institucional/publico`:
+{
+  sedes: [
+    { id, nombre, direccion, horarios: string[], modalidades: string[] }
+  ],
+  planes: [ { id, sedeId, nombre, descripcion, precios: { ... } } ],
+  promociones: [ ... ],
+  preguntasFrecuentes: [ ... ],
+  version: integer >= 1,
+  updatedAt: Timestamp,
+  updatedBy: string
+}
+
+- Lectura pública segura, SIN usuarios, rutinas, tokens, datos administrativos ni
+  teléfonos personales no aprobados para difusión.
+- Solo administración puede editar, con validación y control de versión.
+- Landing y Arevalito leen este documento; no se usa `appData.js` como fuente
+  comercial de verdad tras la migración.
+- Las direcciones Moreno 1020 y Edison 46 provienen del documento académico.
+  Precios, horarios, actividades y contactos requieren validación por el gimnasio;
+  las constantes presentes en el ZIP NO prueban su vigencia.
+
+===============================================================================
+3. PERMISOS DEFINITIVOS (ADR-003)
+===============================================================================
+
+Principio: denegar por defecto; autorización según identidad + activo + rol +
+sede + titularidad/asignación vigente. La autorización se impone en Rules para
+Web SDK y en el Protection Proxy para llamadas privilegiadas a Functions.
+
+MATRIZ:
+Operación                            ADMIN  RECEPCIÓN  PROFESOR   ALUMNO   VISITANTE
+Consultar usuarios globales           SÍ    NO         NO         NO       NO
+Consultar usuarios de propia sede     SÍ    SÍ(a)      NO         NO       NO
+Alta de usuarios                      SÍ(b) SÓLO alumno NO        NO       NO
+Editar perfil de otros usuarios       SÍ(c) SÓLO alumno sede NO   NO       NO
+Activar/desactivar cuentas            SÍ    SÓLO alumno sede NO   NO       NO
+Consultar ficha de alumno             SÍ    SÓLO sede  SÓLO asignado PROPIA NO
+Asignar/reasignar profesor            SÍ(c) SÓLO sede  NO         NO       NO
+Crear nueva rutina asignada           NO    NO         SÓLO asignado NO   NO
+Editar rutina activa                  NO    NO         SÓLO asignado NO   NO
+Consultar rutina actual/historia      NO(d) NO         SÓLO asignado PROPIA NO
+Editar/eliminar rutina histórica      NO    NO         NO         NO       NO
+Consultar biblioteca/plantillas       SEGÚN actual NO  SÓLO permitido NO  NO
+Consultar información institucional   SÍ    SÍ         SÍ         SÍ       SÍ
+Modificar información institucional   SÍ    NO         NO         NO       NO
+Consultar Arevalito IA                 SÍ    SÍ         SÍ         SÍ       SÍ
+
+(a) Recepción consulta perfiles mínimos de profesores de su sede necesarios para
+    asignar alumnos y los alumnos propios. No recibe todos los datos privados de
+    otras cuentas ni acceso global irrestricto.
+(b) Admin puede crear admin/recepción/profesor/alumno mediante Function protegida;
+    el primer admin requiere bootstrap fuera de la UI, documentado y probado.
+(c) Los cambios de rol o sede se realizan mediante operación privilegiada con
+    comprobaciones de relaciones; no equivalen a editar cualquier campo libremente.
+(d) Por minimización de datos, admin NO ve contenido de rutinas en operaciones
+    ordinarias, ya que RF-01 a RF-16 no le atribuyen esa facultad.
+
+REGLAS TRANSVERSALES NO NEGOCIABLES:
+P1. Un usuario inactivo NO puede leer fichas, rutinas ni información privada por
+    SDK o Function, aunque conserve un token de Auth. Puede consultar su propio
+    estado mínimo de cuenta para mostrar el bloqueo de sesión.
+P2. Ningún alumno puede modificar su rol, sede, profesor o rutina.
+P3. Recepción solo cambia los campos de ficha autorizados y asigna profesores
+    EXISTENTES, ACTIVOS, de rol profesor y habilitados en la misma sede.
+P4. Al reasignar profesor P1 -> P2: P1 pierde acceso inmediatamente; P2 puede
+    consultar historia y editar la activa. `autorId` no concede permisos futuros.
+P5. Solo admin traslada un alumno entre sedes. Traslado: conservar todas sus
+    rutinas, retirar la asignación anterior (`profesorId=null`) en la misma
+    operación y exigir nueva asignación válida en destino. La rutina activa
+    continúa visible al alumno; no puede editarla un profesor hasta reasignación.
+P6. Al desactivar un profesor con alumnos asignados, sus permisos cesan
+    inmediatamente y las asignaciones quedan pendientes de reasignación;
+    no se pierde ninguna rutina. La UI debe advertir al personal.
+P7. Cambiar un alumno a un rol distinto NO borra físicamente `alumnos/{uid}`
+    ni rutinas. El cambio requiere operación administrativa explícita que preserve
+    historial y desactive relaciones incompatibles. Si hay riesgo de inconsistencia,
+    se rechaza con `failed-precondition` hasta regularizar relaciones.
+P8. Borrar una cuenta o una rutina histórica no forma parte del flujo ordinario.
+    Baja = `activo=false`; la eliminación legal, si procede, es un proceso
+    excepcional separado, no una operación de recepción.
+P9. `users/{uid}` no confía en alias legacy para autorizar. Crear/escalar admin,
+    modificar `activo` o `sedeIds` requiere operación privilegiada. Debe impedirse
+    dejar la organización sin ningún administrador activo.
+P10. Las consultas Firestore deben incluir restricciones coherentes con las Rules;
+     Rules NO filtran automáticamente una consulta amplia.
+P11. Escrituras directas del Web SDK a `rutinas` y `alumnos.rutinaActivaId`:
+     DENEGADAS. Las Functions autorizadas son la única vía para esas mutaciones.
+P12. Institucional público: lectura sin Auth; escritura únicamente admin activa.
+P13. Toda función con Admin SDK revalida autorización sin confiar en campos
+     `rol`, `sedeId` o `profesorId` enviados por el cliente.
+P14. DNI y otros datos personales nunca se usan en documentos institucionales
+     públicos ni se envían al proveedor de IA.
+
+POLÍTICA DE DNI: se conserva como atributo de ficha, con validación de formato,
+pero NO se impone un nuevo índice global de unicidad como exigencia del TFI:
+RF-01..16 no establecen unicidad global de DNI. Si el gimnasio exige esa regla,
+se agregará mediante cambio formal de contrato y validación transaccional.
+
+===============================================================================
+4. CICLO DE VIDA DEFINITIVO DE RUTINAS / STATE (ADR-004)
+===============================================================================
+
+Estados persistentes: ACTIVA y HISTORICA. No se exige BORRADOR persistente.
+El formulario incompleto es estado temporal del editor React, no otra rutina
+visible en Firestore.
+
+TRANSICIONES:
+[SIN RUTINA] -- asignar R1 --> [R1 ACTIVA]
+[R1 ACTIVA] -- editar R1 --> [R1 ACTIVA, version+1]
+[R1 ACTIVA] -- asignar R2 --> [R1 HISTORICA] + [R2 ACTIVA]
+[R1 HISTORICA] -- consultar --> [R1 HISTORICA, sin cambios]
+[R1 HISTORICA] -- editar/reactivar/eliminar --> RECHAZAR
+
+INVARIANTES:
+R1. `alumnos.rutinaActivaId` es null o refiere a una rutina `estado=activa`
+    del mismo alumno.
+R2. Como máximo una rutina activa por alumno, aun con solicitudes concurrentes.
+R3. Toda nueva asignación crea nuevo documento con ID único; jamás reemplaza R1.
+R4. Transacción de asignación: leer alumno, asignación y puntero; validar profesor
+    autorizado; archivar antigua si existe; crear nueva; actualizar puntero y
+    registrar idempotencia; o se confirma TODO o no se guarda NADA.
+R5. Las ediciones requieren `expectedVersion` actual, alumno vigente y profesor
+    actualmente asignado; aumentan versión. Conflictos: `aborted`.
+R6. Idempotencia por `operationId` único del cliente; reintentos no asignan dos
+    veces una misma operación. El resultado de la primera se conserva.
+R7. Rutinas históricas jamás cambian su contenido, estado ni identificadores
+    mediante los servicios normales.
+R8. El permiso se calcula con la relación alumno-profesor ACTUAL. Una reasignación
+    concurrente invalida una edición que llegó con autorización desactualizada.
+R9. Conservación histórica: se preserva lo que existe; si un historial fue
+    sobreescrito en el código viejo, no se inventan rutinas perdidas.
+R10. `autorId`, `alumnoId`, `sedeId` y `createdAt` permanecen inmutables tras crear.
+
+Implementación del patrón State:
+- `ActiveRoutineState`: habilita `edit()` y `archive()`; rechaza operaciones ajenas.
+- `HistoricalRoutineState`: habilita `read()`; rechaza `edit()`, `archive()` y borrado.
+- `RoutineContext` selecciona el comportamiento del estado e impide transiciones
+  inválidas. La capa de servicio ejecuta la transacción de Firestore después de
+  la autorización del Protection Proxy.
+- Tests unitarios deben demostrar que no se reduce a un mero booleano o switch
+  de interfaz. Un fallo de State no puede dejar una escritura directa abierta.
+
+===============================================================================
+5. CONTRATOS ENTRE MÓDULOS (ADR-005)
+===============================================================================
+
+Se establece una capa de servicios de React como interfaz común; no se construye
+una API Express. Los nombres siguientes son contratos para implementación, no
+funciones existentes en la versión del ZIP.
+
+CONVENCIONES:
+- Todos los IDs son strings UID/doc IDs, no nombres humanos.
+- No se aceptan en payloads de mutación campos de permisos calculados por cliente
+  (`rol`, `autorId`, `sedeId` de autoridad, `activo`, etc.) si no están permitidos
+  por la operación. Los determina el servidor o las Rules.
+- Fechas salen como Timestamp en acceso a Firestore y se serializan de manera
+  estable en modelos de UI; Functions devuelven formatos compatibles documentados.
+- Funciones de lectura pueden exponer `subscribe...` para actualizaciones en vivo.
+- Toda operación devuelve éxito tipado o error estándar; ningún error se
+  transforma silenciosamente en datos demo.
+- Definir validadores compartidos de esquema y tests de contrato antes de integrar.
+
+5.1. Servicio de sesión: `src/services/sessionService.js`
+
+getCurrentProfile() -> UserProfile | null
+subscribeCurrentProfile(onChange) -> unsubscribe
+
+- Authentication verifica login; el perfil en Firestore determina los permisos.
+- Al desactivar o cambiar rol/sede, refrescar vista y bloquear operaciones nuevas.
+- Ausencia de perfil no concede permisos por defecto.
+
+5.2. Cuentas: `src/services/usersService.js`
+
+createUserAccount({ nombre, email, telefono, rol, sedeIds, ... })
+  -> { uid }                      // callable, admin o recepción (solo alumno)
+updateUser({ uid, cambiosPermitidos, expectedVersion? })
+  -> { uid, ...perfilActualizado } // callable para cambios privilegiados
+setUserActive({ uid, activo })
+  -> { uid, activo }              // callable
+getUserById(uid) -> UserProfile permitido
+listUsersByScope(filtrosAutorizados) -> UserProfile[] permitido
+
+- Password/credenciales de inicio: manejo seguro de Auth, nunca guardar password
+  en Firestore ni logs. Definir flujo de alta sin exponer privilegios administrativos.
+- Altas Auth + Firestore con compensación/idempotencia y recuperación de fallos;
+  no se presume transacción entre ambos productos.
+- Bootstrap primer admin fuera del registro público.
+
+5.3. Fichas/asignación: `src/services/studentsService.js`
+
+getStudent(uid) -> StudentDetail permitido
+listStudentsBySede(sedeId) -> StudentSummary[] (recepción/admin)
+listAssignedStudents(profesorUid, sedeId) -> StudentSummary[] (profesor actual)
+updateStudent({ alumnoId, cambiosPermitidos }) -> StudentDetail
+assignProfessor({ alumnoId, profesorId }) -> { alumnoId, profesorId }
+transferStudent({ alumnoId, destinoSedeId }) -> StudentDetail (solo admin)
+
+- `assignProfessor` puede ser transacción Web SDK con Rules que comprueben todas
+  las referencias y permisos; usar Function si los tests de Rules demuestran
+  insuficiencia. El frontend nunca escoge entre vías por su cuenta.
+- `listAssignedStudents` aplica filtros por sede y profesor vigentes, con tests
+  para consultas `get` y `list` de Rules.
+- No sincronizar ni reparar fichas al montar AdminDashboard/RecepcionDashboard.
+
+5.4. Rutinas: `src/services/routinesService.js`
+
+createAssignedRoutine({ alumnoId, nombre, objetivo, semanas, plantillaOrigenId?, operationId })
+  -> { rutinaId, estado:'activa', version:1, anteriorArchivadaId: string|null }
+
+updateActiveRoutine({ alumnoId, rutinaId, expectedVersion, nombre, objetivo, semanas, operationId })
+  -> { rutinaId, estado:'activa', version: integer }
+
+getActiveRoutine(alumnoId) -> Routine | null
+subscribeActiveRoutine(alumnoId, onChange) -> unsubscribe
+listRoutineHistory(alumnoId) -> RoutineSummary[]
+getRoutineById(rutinaId) -> Routine permitido
+
+- `createAssignedRoutine` y `updateActiveRoutine`: callable Functions; autor,
+  sede de contexto y timestamps los determina la función a partir de Auth/datos.
+- Las lecturas: Web SDK, con Rules e índices acordados.
+- DTO único: `semanas[].dias[].etapas.{Movilidad,Activación,Central}[]`.
+- `observacion` singular en cada ejercicio; prohibir fallback a `rutinaDemo`.
+- Profesor lee activa/historia si sigue asignado; alumno lee solo las propias.
+- Leer una rutina por ID no es permiso para leer cualquier rutina por ID.
+
+5.5. Biblioteca: `src/services/libraryService.js`
+
+listAvailableExercises({ sedeId? }) -> Exercise[]
+createOrUpdateExercise(payload) -> Exercise
+listOwnTemplates() -> Template[]
+createOrUpdateTemplate(payload) -> Template
+
+- Mantener CRUD Web SDK actual y sus permisos, corrigiendo solo validaciones
+  y diferencias realmente encontradas. Una plantilla NO es historial asignado.
+
+5.6. Información institucional: `src/services/institutionalService.js`
+
+getPublicInstitutionalInfo() -> InstitutionalInfo
+subscribePublicInstitutionalInfo(onChange) -> unsubscribe
+updateInstitutionalInfo({ cambiosPermitidos, expectedVersion })
+  -> { version, updatedAt }
+
+- Lectura pública Firestore (`institucional/publico`); escritura administrativa
+  con Rules estrictas y control de versión, o callable si las validaciones
+  compartidas no pueden garantizarse en Rules. La decisión de implementación
+  concreta debe demostrarse en pruebas; el contrato no cambia.
+- Validar información contra datos aprobados por Gimnasio Anima.
+
+5.7. IA: `src/services/chatService.js`
+
+askInstitutionalQuestion({ sedeId, pregunta })
+  -> { respuesta, fuenteVersion, requiereAtencionHumana: boolean }
+
+- Callable Function disponible a visitantes y a usuarios autenticados.
+- Solo envía contexto institucional PUBLICADO; no tokens personales, perfiles,
+  DNI, rutinas ni datos privados al proveedor.
+- La Function valida longitud, sede, alcance, límites de uso, App Check cuando
+  esté configurado y manejo de fallas; clave API exclusivamente en servidor.
+- Objetivo RNF-04: respuesta visible o error controlado dentro de 20 segundos;
+  se medirá de punta a punta con consultas y fallas reales. No prometer una
+  respuesta útil cuando el proveedor esté caído.
+- Proveedor y región se elegirán como decisión de infraestructura antes de
+  desplegar, sin cambiar este contrato ni habilitar facturación automáticamente.
+
+5.8. ERRORES ESTÁNDAR
+
+unauthenticated: sesión ausente/no válida
+permission-denied: rol, cuenta, sede o asignación insuficiente
+invalid-argument: payload o formato incorrecto
+not-found: usuario, alumno, rutina o sede inexistente
+failed-precondition: transición o relación del negocio inválida
+already-exists: duplicación de una operación/identidad
+aborted: conflicto de versión o transacción
+unavailable: dependencia o servicio no disponible
+deadline-exceeded: tiempo máximo de operación excedido
+
+La UI convierte estos códigos en mensajes entendibles. No ocultar un error
+mostrando una rutina de demostración ni duplicar una operación a ciegas.
+
+===============================================================================
+6. SEGURIDAD: PROTECTION PROXY (ADR-006)
+===============================================================================
+
+Se implementará un Protection Proxy real, no solo `ProtectedRoute`:
+
+ProtectedRoutineService / ProtectedAccountService:
+  1. verifica token/identidad del solicitante;
+  2. carga perfil actual y exige `activo=true`;
+  3. verifica rol, sede, titularidad y relación alumno-profesor ACTUAL;
+  4. valida la operación solicitada y su estado;
+  5. delega en repositorio/servicio transaccional de Firebase;
+  6. devuelve DTO seguro o error específico; registra evento mínimo sin secretos.
+
+- Para Web SDK, Firestore Security Rules son la barrera efectiva de servidor.
+  El wrapper de servicios React organiza el código, pero NO reemplaza Rules.
+- Para Admin SDK, el Proxy dentro de la Function es la barrera efectiva.
+- No habilitar lectura/escritura indiscriminada con un rol administrador en
+  el cliente para sustituir permisos granulares de cada colección.
+- Índices y filtros de consulta alineados con Rules; probar lecturas individuales
+  y colecciones para todos los roles, sedes e inactivos.
+- Test negativo obligatorio: alumno A no lee rutina B; profesor no asignado no
+  lee ni modifica; recepción no traslada sede; inactivo no lee datos privados;
+  nadie muta una histórica; Web SDK no escribe rutinas; visitante no ve privados.
+- En modalidad R3: construir pruebas puras y dobles sin red para el desarrollo;
+  las verificaciones reales de Firestore Rules, cuentas y transacciones quedan
+  PENDIENTES hasta un procedimiento autorizado y controlado. No certificar RNF-01
+  ni tareas de seguridad solo con mocks. Si no hay forma segura de probar,
+  informar bloqueo de validación; no intentar operaciones peligrosas en `animappv1`.
+
+===============================================================================
+7. RESPONSABILIDADES Y PROPIEDAD DE ARCHIVOS (ADR-007)
+===============================================================================
+
+LAUTARO — Firebase, dominio de rutinas y seguridad (9 tareas)
+- FB-004..FB-010, FB-031, FB-033.
+- Modelo/State de rutinas; Cloud Functions de rutinas y Protection Proxy;
+  Firestore Security Rules, índices, control de concurrencia, CI, despliegue
+  autorizado y configuración compartida.
+- Archivos objetivo: `functions/src/routines/**`, `functions/src/security/**`,
+  `firestore.rules`, `firestore.indexes.json`, `functions/src/index*`,
+  `src/firebase/config.js`, `package.json`, lockfiles, `.github/workflows/**`.
+- NO asignar FB-002/003 ni instalación obligatoria de emuladores.
+
+ULISES — cuentas, alumnos e información institucional (10 tareas)
+- FB-011..FB-019 y FB-032.
+- Altas y gestión de cuentas, backfills, asignación segura, institucional,
+  sesión React y documentación académica.
+- Archivos objetivo: `functions/src/accounts/**`, servicios accounts/students/
+  institutional, `src/pages/AdminDashboard.jsx`, `src/pages/RecepcionDashboard.jsx`,
+  componente institucional, `src/context/AuthContext.jsx`,
+  `src/components/ProtectedRoute.jsx`, `src/pages/Login.jsx`.
+
+JUAN PABLO — interfaz de rutinas, adaptación e IA (11 tareas)
+- FB-020..FB-030.
+- Adaptadores de SDK/callables, rutina activa e historial del alumno, editor
+  profesor, chatbot IA y su callable, landing, UX/responsive/E2E y demo.
+- Archivos objetivo: `src/App.jsx`, `src/pages/AlumnoDashboard.jsx`,
+  `src/components/RoutineWorkspace.jsx`, `src/components/ArevalitoChat.jsx`,
+  servicios de rutinas/chat/adaptadores, `functions/src/chat/**`, CSS global.
+
+ACUERDOS DE INTEGRACIÓN DIRECTA A MAIN (R3):
+- El dueño de un archivo coordina cambios con los otros antes de modificarlo.
+  Los nombres de archivo específicos se verifican en el HEAD real.
+- Todos trabajan en su `main` local y pueden hacer commits/push a `origin/main`,
+  PERO solo con árbol limpio al iniciar, revisión del diff, pruebas locales
+  seguras, `git fetch/pull` y sin cambios no relacionados ni conflictos.
+- Si `main` avanzó, integrar cambios ajenos y volver a probar. Si hay conflicto,
+  no elegir `ours`/`theirs` automáticamente: detener y coordinar.
+- PROHIBIDO force push, reset --hard de trabajo ajeno, despliegue desde Codex,
+  cambios en facturación, secretos o pruebas destructivas sin autorización.
+- Antes de cada push se debe comprobar si existe CI/CD que despliega desde main.
+  Si existe despliegue automático, NO hacer push sin autorización de release.
+- Registrar evidencia y siguiente tarea en un archivo NUEVO por FB debajo de
+  `docs/tfi/progreso/`, sin modificar fichas de otros integrantes.
+- Los tres programan y revisan sus propios aportes auténticos; no se falsifica
+  autoría ni se simulan commits de otro integrante.
+- El contrato gobierna estructuras/operaciones; `DECISIONES_EQUIPO_R3.md`
+  prevalece únicamente en modalidad de trabajo y pruebas. El plan operativo
+  R3 fija secuencia, tareas y dependencias. No se ignora el contrato.
+
+===============================================================================
+8. DECISIONES SOBRE CASOS LÍMITE (ADR-008)
+===============================================================================
+
+D1. Dos sedes oficiales: `moreno` y `edison`. La tercera sede del ZIP queda fuera
+    de flujo operativo objetivo; primero se busca cualquier dato relacionado.
+D2. Alumno con profesor asignado de otra sede: estado inválido, no se permite
+    confirmarlo. La operación debe fallar antes de escribir.
+D3. Reasignación: nuevo profesor accede a vigente e historial; anterior pierde
+    inmediatamente ambos accesos. Las rutinas conservan `autorId` original.
+D4. Traslado de sede: solo admin; asignación queda vacía hasta que recepción de
+    destino asigne profesor habilitado. La historia no cambia.
+D5. Inactivación: impide inmediatamente accesos nuevos a información protegida;
+    no puede borrar datos previamente descargados del dispositivo del usuario.
+D6. Alta admin adicional: permitida solo por admin activo mediante función
+    privilegiada y auditable. Primer admin por bootstrap fuera de la interfaz.
+D7. Cambio de email: no editar simplemente el campo en Firestore; sincronizar
+    con Firebase Auth mediante flujo privilegiado y recuperación de fallos.
+D8. Rutina: edición no crea historial de cada pulsación; solo una nueva ASIGNACIÓN
+    archiva la anterior. Versionar ediciones de la activa para evitar pérdidas.
+D9. Datos de una plantilla: se copian como snapshot al asignar. Actualizaciones
+    posteriores de plantilla no alteran rutinas antiguas.
+D10. Datos institucionales: valores publicados, versionados y aprobados por el
+     gimnasio; cuando se desconozca información, el bot debe reconocerlo.
+D11. No se elimina físicamente un alumno al cambiar rol o desactivar; preservar
+     historia y referencias hasta política explícita de baja legal.
+D12. Alta repetida con el mismo email: Auth no crea una segunda cuenta. Duplicados
+     de ficha por UID quedan impedidos por identidad canónica. No se agrega una
+     obligación de DNI único global no contenida en los RF.
+D13. Acceso de admin a rutinas personales: NO por defecto. Rol admin gestiona
+     cuentas e institucional; no participa del entrenamiento asignado.
+D14. Sin borrador persistente de rutina. Editor local no constituye asignación.
+
+===============================================================================
+9. CRITERIOS DE ACEPTACIÓN DE FB-001
+===============================================================================
+
+[DEFINIDO] Arquitectura Firebase BaaS y decisiones de frontera SDK/Functions/Rules.
+[DEFINIDO] Dos sedes y roles oficiales.
+[DEFINIDO] Entidades/identificadores canónicos y política de migración legacy.
+[DEFINIDO] Matriz de permisos y reglas para inactivos, reasignación y traslados.
+[DEFINIDO] Estado de rutina activa/histórica, transiciones y concurrencia.
+[DEFINIDO] Contratos de sesión, cuentas, alumnos, rutinas, institucional e IA.
+[DEFINIDO] Errores comunes, pruebas esperadas y propiedad de archivos.
+[DEFINIDO] Prohibición de escribir rutinas directamente desde el cliente.
+[DOCUMENTADO] Discordancia académica Express/SQL vs Firebase BaaS.
+[EXTERNO] Ratificación de equipo y conformidad de cátedra NO acreditadas aquí.
+[NO CORRESPONDE A FB-001] Código implementado, tests funcionales RF o despliegue.
+
+DICTAMEN DE CIERRE:
+FB-001 = CERRADA COMO ESPECIFICACIÓN TÉCNICA OPERATIVA.
+Este documento se adopta como contrato base para la implementación. Cambios
+posteriores requieren decisión/ADR documentada, justificación y revisión de afectados;
+no se reabre informalmente la arquitectura por diferencias de interpretación.
+La aprobación formal del equipo y la adecuación de documentación ante la cátedra
+se gestionan como decisiones externas rastreables, no como código pendiente.
+
+===============================================================================
+10. CÓMO DESBLOQUEA EL DESARROLLO
+===============================================================================
+
+Lautaro puede comenzar por FB-006 (modelo/State), continuar FB-005 (base
+callable/Proxy) y FB-004 (Rules), con pruebas puras y sin desplegar nada.
+
+Ulises puede empezar FB-011 eliminando escrituras automáticas de listeners sin
+abrir los paneles contra datos existentes de `animappv1`. Luego prepara la
+callable de altas cuando esté integrado FB-005.
+
+Juan Pablo puede empezar FB-020 (adaptadores SDK/callables mínimos) usando
+mocks y el contrato ya definido, antes de integrar el dashboard al backend.
+
+Integración vertical acordada a verificar posteriormente con datos de prueba
+controlados y autorización explícita, NO por efecto de push:
+  1. Crear alumno -> asignar profesor habilitado.
+  2. Profesor crea R1 -> alumno lee R1.
+  3. Profesor crea R2 -> R1 histórica, R2 activa.
+  4. Profesor edita R2 con control de versión -> R1 inmutable.
+  5. Reasignar profesor -> anterior denegado, nuevo autorizado.
+  6. Inactivar cuenta -> acceso privado denegado.
+  7. Admin cambia información institucional -> visitante recibe IA vigente.
+
+No se exige emulador para programar, pero los RF/RNF que requieran integración
+real permanecen no verificados mientras no se presenten pruebas suficientes.
+No probar en producción real por impulso de un agente.
+
+Secuencia de trabajo sobre `main` (sin ramas ni PR):
+  1. Incorporar documentos R3 en un commit EXCLUSIVAMENTE documental.
+  2. Confirmar con los tres el contrato y restricciones de archivos.
+  3. Comenzar en paralelo FB-011 (Ulises), FB-006 (Lautaro), FB-020 (Juan Pablo).
+  4. Después de cada tarea, inspeccionar diff/tests, commit y push de ese autor.
+  5. Antes de otra tarea, actualizar `main` y verificar dependencias reales.
+  6. Coordinar cada cambio remoto de Rules/Functions/Hosting por separado.
+
+===============================================================================
+11. REFERENCIAS Y TRAZABILIDAD
+===============================================================================
+
+Fuentes del equipo:
+- ZIP del repositorio AnimApp: `firestore.rules`, `AdminDashboard.jsx`,
+  `RecepcionDashboard.jsx`, `RoutineWorkspace.jsx`, `AlumnoDashboard.jsx`,
+  `AuthContext.jsx`, `appData.js`, `ArevalitoChat.jsx`.
+- «Idea Proyecto TFI» (RF-01..16; RNF-01..04; State y Protección Proxy).
+- Auditoría R2 y plan R2 completos de Codex, recibidos como archivos.
+- `DECISIONES_EQUIPO_R3.md` y `PLAN_FINALIZACION_TFI.md` de este paquete.
+- Informe previo de pruebas de FB-003, solo como antecedente histórico no adoptado.
+
+Documentación Firebase consultable:
+- Consultas y reglas: https://firebase.google.com/docs/firestore/security/rules-query
+- Transacciones: https://firebase.google.com/docs/firestore/manage-data/transactions
+- Callable Functions: https://firebase.google.com/docs/functions/callable
+
+===============================================================================
+FIN DE FB-001 — CONTRATO BASE DE ANIMAPP
+===============================================================================
