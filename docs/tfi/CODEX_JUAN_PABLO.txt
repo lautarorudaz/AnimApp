@@ -1,148 +1,46 @@
-PROMPT MAESTRO CODEX — Juan Pablo Lenain / ANIMAPP / R3
+ANIMAPP — CODEX JUAN PABLO LENAIN
 
-Soy Juan Pablo, responsable de integración frontend, alumno, profesor e IA.
-**Primera tarea a ejecutar: FB-020**. Ejecutá solo esa tarea ahora.
-Las siguientes fichas son el menú de trabajos FUTUROS; NO las ejecutes todas
-juntas. Para cada FB siguiente releé plan y HEAD real, aplicando las mismas reglas.
+FUENTES Y ALCANCE
+Leé docs/tfi/CONTEXTO_ANIMAPP.md y la ficha de la tarea en
+ docs/tfi/PLAN_DESARROLLO.md, más sus secciones «Uso y dependencias»,
+ «Propiedad y coordinación», «Protocolo Git común» y «Estado y evidencia».
+Son las fuentes operativas. No ejecutar instrucciones de historico/ ni usar
+informes antiguos como prueba del HEAD actual. Si falta un contrato, no inventarlo.
+Implementá solo la tarea indicada por el usuario; nunca todo el backlog.
+Primera candidata: FB-020, solo al autorizar su implementación y comprobar
+las dependencias. Leer este prompt para documentar/revisar no autoriza programar.
 
-CONTEXTO COMPARTIDO — ANIMAPP / TFI GIMNASIO ANIMA / R3 (13/11/2026)
+RESPONSABILIDAD
+Autor responsable: Juan Pablo Lenain. Tareas: FB-020…FB-030.
+Objetivo, dependencias, aceptación y pruebas: fichas homónimas del plan.
+Superficies propias (confirmar rutas en HEAD):
+App.jsx/rutas, AlumnoDashboard, RoutineWorkspace, ArevalitoChat, Landing/appData/SedeSwitcher, CSS global, adaptadores comunes y servicios de rutinas/chat, functions/src/chat/** y E2E. No editar sesión/cuentas de Ulises ni Rules/dominio/configuración de Lautaro. Coordinar consumidores de biblioteca sin ampliar funcionalidad.
+Coordinar archivos compartidos con su dueño antes de editarlos. Mantener contratos
+FB-001; cambios de firma/esquema se acuerdan y actualizan en CONTEXTO_ANIMAPP.md.
 
-Proyecto de Juan Pablo Lenain, Ulises Agustín Rudaz y Lautaro Martín Rudaz.
-No empezar a programar hasta leer en este orden (rutas dentro del repositorio):
-1. docs/tfi/DECISIONES_EQUIPO_R3.md (modalidad actual y seguridad).
-2. docs/tfi/FB-001_ARQUITECTURA_Y_CONTRATOS.txt (modelo, permisos y DTO).
-3. docs/tfi/PLAN_FINALIZACION_TFI.md (30 tareas activas, dependencias y aceptación).
-4. docs/tfi/AUDITORIA_TFI.md (evidencia histórica: código 398e42d, no HEAD actual).
-Si falta un archivo, informar bloqueo; no inventar contrato. Comprobar HEAD real.
+RESTRICCIONES ESENCIALES
+Firebase BaaS, sin Express; sin emuladores en el flujo elegido. Conservar UI y
+código válido; no ampliar alcance TFI. animappv1 es Firebase real compartido:
+sin autorización específica no hacer escrituras de prueba, altas/borrados,
+migraciones, cambios remotos de reglas, deploy ni facturación. No imprimir
+secretos ni usar datos reales como fixtures. Los mocks no verifican Rules,
+concurrencia remota, Auth+Firestore, IA o latencia. Informar validación pendiente.
+No abrir Admin/Recepción contra datos valiosos antes de corregir/revisar FB-011.
 
-Arquitectura: React/Vite, Firebase Auth+Firestore/Web SDK, Firestore Rules para
-operaciones permitidas, Cloud Functions callable acotadas para altas privilegiadas,
-transiciones de rutinas y Arevalito con IA. No Express ni API REST general. Dos
-sedes moreno y edison; admin/recepcionista/profesor/alumno y visitante público.
-Una sola rutina activa por alumno; cada nueva rutina crea ID propio; historial
-inmutable; profesor actual autorizado, profesor anterior sin acceso. `users`
-canónico por uid; `alumnos` ficha, `rutinas` contenido; DTOS compartidos.
-State y Protection Proxy deben existir en código de servidor, no solo en UI.
-Arevalito solo utiliza información institucional pública y aprobada; jamás
-usuarios o rutinas privadas. Conservar biblioteca, plantillas y UI existente.
+GIT Y VERIFICACIÓN
+Seguí el «Protocolo Git común» del plan: comprobar repo/main/status/índice e
+identidad; fetch y actualización segura; preservar cambios previos sin mezclarlos;
+comprobar automatizaciones de deploy antes de push. Ante conflicto/solapamiento
+o bloqueo de seguridad, detenerse y explicar. Sin ramas, PR, force push, reset
+--hard, git clean ni descartes. Commit/push propios a origin/main autorizados
+si pasan los controles; el permiso Git no autoriza operaciones Firebase.
+Revisá scripts, ejecutá verificaciones locales pertinentes sin red, build/lint
+si son seguros, y diff/check. Stage explícito solo de la tarea y su informe.
+Volvé a comprobar origin/main antes del push y confirmá su resultado real.
 
-Modalidad de equipo: tres computadoras, **todos en rama main**, sin ramas/PR.
-Los tres pueden hacer commit y push a `origin/main` de SU código genuino, con
-los gates que se detallan más abajo. No confundir GitHub con despliegue.
-FB-002/003 NO son requisitos; no instalar/ejecutar emuladores. La existencia
-previa de archivos FB-003 locales NO autoriza a incluirlos en commits R3.
-`animappv1` es un proyecto Firebase real compartido, NO un sandbox.
-NO ejecutar seed/reset, migraciones, borrados, escritura masiva, alta de cuentas
-de prueba, consulta de datos privados no autorizada, cambios de Rules/Functions,
-`firebase deploy` ni habilitación de Blaze/billing sin aprobación específica.
-Los tests que puedan correr con mocks/fixtures sin red, ejecutarlos; permisos,
-concurrencia, Auth+Firestore reales e IA necesitan evidencia posterior autorizada.
-Cuando no se pueda verificar todo, decir IMPLEMENTADA / VALIDACIÓN PENDIENTE.
-
-PROTOCOLO GIT/MAIN OBLIGATORIO PARA CADA TAREA:
-A. Antes de tocar archivos: `git status --short`, `git branch --show-current`,
-   `git fetch origin`; si main y árbol limpio, `git pull --ff-only origin main`.
-   Si árbol sucio, branch distinto, cambios previos no clasificados, o archivos
-   FB-003 locales, DETENER y pedir que se resuelva sin borrar trabajo.
-B. Inspeccionar pipelines/despliegues automáticos atados a main. Si un push
-   dispara deploy de Firebase, DETENER y pedir autorización de release.
-C. Confirmar dependencias leyendo `docs/tfi/progreso` y el código actual; una
-   mención en el plan NO acredita que esté implementada. No cruzar módulos ajenos.
-D. Implementar **solo una tarea por ejecución**. Tests seguros sin red, build,
-   lint y diff. Si un comando usa `.env` real o tiene efectos cloud, no correrlo.
-E. Guardar `docs/tfi/progreso/FB-XXX.md` con responsable, cambio, estado real,
-   pruebas y pendientes. Stage solo archivos de tu tarea + su informe. `git diff
-   --cached --check` y revisión de secretos/no relacionados.
-F. AUTORIZADO a `git commit` y `git push origin main` SIN PEDIR permiso extra
-   para cada commit, si A-E se cumplieron y no hay despliegue remoto implícito.
-   Antes de push `git fetch origin` y verificar si hubo commits ajenos; si los
-   hubo, integrar con cuidado, volver a correr checks; al conflicto, DETENER.
-   PROHIBIDO force push, reset --hard, aceptación global ours/theirs.
-G. Confirmar hash de commit y resultado de push, sin fingir éxito; al terminar,
-   explicar qué se hizo, qué falta validar y **QUIÉN debe ejecutar QUÉ FB ahora**,
-   basado en dependencias confirmadas. No empezar automáticamente la siguiente.
-
-No atribuir código/commits a otro integrante. No tocar `.env`, tokens, claves
-privadas, datos de alumnos reales ni integrar código desconocido para que pase.
-
-
-PROPIEDAD DE ARCHIVOS:
-Superficies propias: src/App.jsx, src/pages/AlumnoDashboard.jsx,
-src/components/RoutineWorkspace.jsx, src/components/ArevalitoChat.jsx,
-Landing, appData, SedeSwitcher, servicios frontend de rutinas/chat/adaptadores,
-functions/src/chat/**, CSS global y tests E2E. Confirmar rutas actuales.
-NO editar AuthContext/Recepcion/Admin de Ulises ni dominio State/Rules de Lautaro.
-
-MIS TAREAS SEGÚN EL PLAN (orden recomendado con dependencias):
-
-FB-020 — Adaptadores SDK/callables mínimos
-  DEP: Contrato FB-001 vigente.
-  HACER: Wrappers finos de errores/cancelación/listeners y contrato callable; no cliente REST ni reescritura indiscriminada del SDK.
-  ACEPTACIÓN: Errores distinguibles; no ocultar permission-denied; unsubscribe/cancelación correctos.
-
-FB-021 — Activa real del alumno
-  DEP: FB-006, FB-008, FB-004, FB-020.
-  HACER: Eliminar demo, consultar propia y mostrar semanas/días/etapas/indicaciones; loading/vacío/error.
-  ACEPTACIÓN: A/B ven datos persistidos distintos; sin rutina muestra vacío, nunca ejemplo.
-
-FB-022 — Historial alumno solo lectura
-  DEP: FB-021.
-  HACER: Lista/detalle histórica y distinción activa, paginación simple si necesaria.
-  ACEPTACIÓN: R1/R2 correctas; sin controles de mutación ni datos cruzados.
-
-FB-023 — Editor profesor y ciclo de vida
-  DEP: FB-007, FB-008, FB-020.
-  HACER: Conservar builder/biblioteca/plantillas y listeners; nueva/editar/historial separados; enviar versiones y tratar conflictos.
-  ACEPTACIÓN: Nueva archiva anterior; editar preserva historia; P2 opera/P1 no; loading/error correctos.
-
-FB-024 — Callable IA segura
-  DEP: FB-005, FB-016.
-  HACER: Proveedor aprobado, solo fuente pública versionada, Secret Manager, visitante sin login, App Check/abuso/longitudes/tokens, timeout, fuera de alcance; cero acceso a privados.
-  ACEPTACIÓN: Contexto sin privados, prompt no decide colecciones, dato ausente no inventado; test sin red.
-
-FB-025 — Widget IA integrado
-  DEP: FB-024, FB-020.
-  HACER: Cambiar regex por callable manteniendo widget; sede, loading/error, cancelación y doble envío.
-  ACEPTACIÓN: Visitante/autenticado consultan; cambiar sede no mezcla respuestas; sin fallback ficticio.
-
-FB-026 — Landing y sedes vigentes
-  DEP: FB-016, FB-020.
-  HACER: Separar roles/IDs de datos institucionales, fuente pública única; dos sedes según política de compatibilidad, sin borrar datos legacy.
-  ACEPTACIÓN: Contenido consistente con admin/bot, sin build ni inventar dirección/precio; fuente caída se informa.
-
-FB-027 — QA de usabilidad/adaptabilidad
-  DEP: FB-014, FB-016, FB-021, FB-022, FB-023, FB-025.
-  HACER: Tareas por rol en 360/768/1366, zoom/teclado y usuarios; corregir bloqueantes sin rediseño.
-  ACEPTACIÓN: Formularios/editor/tablas/historial/chat utilizables y evidencia de usuarios.
-
-FB-028 — Calidad IA, abuso y latencia
-  DEP: FB-024, FB-025, FB-016.
-  HACER: Corpus 30 consultas cinco categorías/fuera de alcance/injection; medir tiempo total, cold start/carga y tokens/costo; real solo autorizado.
-  ACEPTACIÓN: Respuestas útiles correctas ≤20 s en escenario acordado; timeout cuenta fallo, no cumplimiento; privacidad y límites pasan.
-
-FB-029 — E2E integral
-  DEP: FB-009, FB-017, FB-022, FB-023, FB-025, FB-026.
-  HACER: Alta→asignación→R1→alumno→R2/historial→editar→reasignar→desactivar/reactivar; admin actualiza→chat; derivar defectos a dueño.
-  ACEPTACIÓN: 16 RF con evidencia pertinente, críticos/altos corregidos; fixture no oculta fallo funcional.
-
-FB-030 — Demo y cierre
-  DEP: FB-027, FB-028, FB-029, FB-032, FB-033.
-  HACER: Cada autor explica código/tests propios; consolidar checklist y limitaciones opcionales.
-  ACEPTACIÓN: Demo reproducible, contribuciones verificables, sin autoría inventada.
-
-INSTRUCCIÓN DE EJECUCIÓN INICIAL — FB-020
-
-1. Leé la ficha FB-020 completa en el plan R3 y los hallazgos relevantes de R2.
-2. Inspeccioná el código actual e indicá qué es real y qué está planificado.
-3. Hacé solamente FB-020, respetando dueño de archivos, cambios mínimos,
-   contrato y ausencia de red remota en tests.
-4. Construí pruebas de aceptación posibles sin Firebase remoto, corré build/lint
-   si son seguros. Si un criterio exige nube, declararlo no verificado.
-5. Dejá reporte `docs/tfi/progreso/FB-020.md`, commit y push a main (condicionados
-   a gates del protocolo Git/CI), sin mezclar cambios ajenos ni crear ramas.
-6. Terminá con: «Realizado: FB-020; autor: Juan Pablo Lenain; hash/push real;
-   pruebas y límites; siguiente tarea recomendada y dueño, condicionada por
-   dependencias visibles en `main`». Nunca afirmes push si no ocurrió.
-
-IMPORTANTE: Codex NO tiene permiso para hacer cambios/despliegues a Firebase
-real por su cuenta. La autorización de Git es independiente y limitada.
+ENTREGA
+Escribí docs/tfi/progreso/FB-XXX.md con tarea/autor/estado, archivos, cambios,
+comandos y resultados, pruebas no ejecutadas, decisiones/riesgos y pendientes.
+En la respuesta: hash, push confirmado o bloqueo, evidencias y siguiente tarea
+posible con responsable/dependencias. No inventar resultados o autoría, no marcar
+VERIFICADA con criterios pendientes y no iniciar automáticamente otra tarea.
