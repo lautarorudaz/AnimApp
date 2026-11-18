@@ -66,6 +66,12 @@ export default function ProfesorDashboard() {
     return matches && (status === 'todos' || (status === 'activos' ? isStudentActive(student) : !isStudentActive(student)));
   }).sort((a, b) => (a.nombre || '').localeCompare(b.nombre || '', 'es')), [students, search, status]);
   const open = (mode, student) => { setDialog({ mode, student }); setActionError(''); };
+  const routineSaved = (message, result) => {
+    setNotice(message);
+    if (result?.studentId && result.rutinaActivaId) {
+      setStudents((current) => current.map((student) => student.id === result.studentId ? { ...student, rutinaActivaId: result.rutinaActivaId } : student));
+    }
+  };
   const deactivate = async () => {
     setBusy(true); setActionError('');
     try { await updateStudent(dialog.student.id, { activo: false, active: false, estado: 'Baja' }, userProfile); setNotice('Alumno dado de baja. Sus datos y rutinas se conservaron.'); setDialog(null); }
@@ -84,8 +90,8 @@ export default function ProfesorDashboard() {
     </article>)}</div>}
     <p className="training-footnote">Podés crear una rutina propia o asignar una genérica y adaptarla a cada alumno.</p>
     {dialog?.mode === 'student' && selectedCurrent && <StudentForm student={selectedCurrent} actor={userProfile} onClose={() => setDialog(null)} onSaved={setNotice} />}
-    {dialog?.mode === 'template' && selectedCurrent && canEdit && <PickGenericRoutine student={selectedCurrent} actor={userProfile} onClose={() => setDialog(null)} onSaved={setNotice} />}
-    {['edit', 'history'].includes(dialog?.mode) && selectedCurrent && (dialog.mode === 'history' || canEdit) && <StudentRoutines student={selectedCurrent} actor={userProfile} mode={dialog.mode} onClose={() => setDialog(null)} onSaved={setNotice} />}
+    {dialog?.mode === 'template' && selectedCurrent && canEdit && <PickGenericRoutine student={selectedCurrent} actor={userProfile} onClose={() => setDialog(null)} onSaved={routineSaved} />}
+    {['edit', 'history'].includes(dialog?.mode) && selectedCurrent && (dialog.mode === 'history' || canEdit) && <StudentRoutines student={selectedCurrent} actor={userProfile} mode={dialog.mode} onClose={() => setDialog(null)} onSaved={routineSaved} />}
     {dialog?.mode === 'edit' && selectedCurrent && !canEdit && <Modal title="Alumno dado de baja" onClose={() => setDialog(null)}><p>El alumno fue dado de baja. Sus rutinas se conservan en el historial.</p></Modal>}
     {dialog?.mode === 'deactivate' && selectedCurrent && <Modal title="Dar de baja al alumno" onClose={() => setDialog(null)} busy={busy}><Notice error>{actionError}</Notice><p>¿Querés dar de baja a <strong>{selectedCurrent.nombre}</strong>? Se conservarán sus datos e historial y no se podrán publicar nuevas rutinas mientras esté de baja.</p><div className="training-modal-actions"><button className="btn-secondary" disabled={busy} onClick={() => setDialog(null)}>Cancelar</button><button className="btn-primary" disabled={busy} onClick={deactivate}>{busy ? 'Guardando…' : 'Confirmar baja'}</button></div></Modal>}
   </Workspace>;

@@ -2,10 +2,11 @@ import { useEffect, useState } from 'react';
 import { doc, onSnapshot } from 'firebase/firestore';
 import { db } from '../../firebase/config';
 import { useAuth } from '../../context/auth';
-import { saveRoutine, watchStudents } from './data';
+import { watchStudents } from './data';
 import { watchVisibleItems } from './libraryData';
-import { friendlyError, isStudentActive, normalizeRoutine } from './model';
+import { friendlyError, isStudentActive } from './model';
 import { Empty, Field, Modal, Notice } from './Workspace';
+import RoutineEditor from './RoutineEditor';
 
 export default function AssignRoutine({ template, student: initialStudent, onClose, onSaved }) {
   const { userProfile, activeSede } = useAuth();
@@ -14,8 +15,7 @@ export default function AssignRoutine({ template, student: initialStudent, onClo
   const [loading, setLoading] = useState(true);
   const [draftLoading, setDraftLoading] = useState(true);
   const [revision, setRevision] = useState(0);
-  const [publish, setPublish] = useState(true);
-  const [busy, setBusy] = useState(false);
+  const [editing, setEditing] = useState(false);
   const [error, setError] = useState('');
   const uid = userProfile.uid; const admin = userProfile.rol === 'admin'; const sedeId = activeSede?.id;
   useEffect(() => {
@@ -28,23 +28,19 @@ export default function AssignRoutine({ template, student: initialStudent, onClo
     return onSnapshot(doc(db, 'rutinasBorradores', selected), (snapshot) => { setRevision(snapshot.data()?.revision || 0); setDraftLoading(false); }, (err) => { setError(friendlyError(err)); setDraftLoading(false); });
   }, [selected]);
   const student = students.find((item) => item.id === selected);
-  const assign = async (event) => {
+  const continueToEditor = (event) => {
     event.preventDefault(); if (!student) { setError('Elegí un alumno de tu sede.'); return; }
-    setBusy(true); setError('');
-    try {
-      await saveRoutine({ student, actor: userProfile, routine: normalizeRoutine(template), sourceTemplateId: template.id, publish, expectedRevision: revision });
-      onSaved(publish ? 'Rutina asignada y publicada para el alumno.' : 'Rutina asignada como borrador. Podés adaptarla antes de publicar.'); onClose();
-    } catch (err) { setError(friendlyError(err)); } finally { setBusy(false); }
+    setError(''); setEditing(true);
   };
-  return <Modal title="Asignar rutina a un alumno" onClose={onClose} busy={busy}><form onSubmit={assign}><Notice error>{error}</Notice><div className="training-assignment-summary"><span className="training-eyebrow">RUTINA GENÉRICA</span><h3>{template.nombre}</h3><p className="training-muted">Se copiará el plan completo. La plantilla original no cambia.</p></div>
-    {loading ? <p role="status">Cargando alumnos de {activeSede?.nombre}…</p> : !students.length ? <Empty title="Sin alumnos activos">No tenés alumnos asignados en la sede activa. Cambiá de sede desde Alumnos.</Empty> : <fieldset className="training-fieldset" disabled={busy}>
-      <Field label={`Alumno · ${activeSede?.nombre || ''}`}><select className="form-input" required value={selected} onChange={(event) => { setSelected(event.target.value); setError(''); }}><option value="">Seleccioná un alumno</option>{students.map((item) => <option key={item.id} value={item.id}>{item.nombre} · DNI {item.dni || 'sin registrar'}</option>)}</select></Field>
-      <label className="training-sharing"><input type="checkbox" checked={publish} onChange={(event) => setPublish(event.target.checked)} /><span><strong>Publicar al asignar</strong><small>Desactivalo si querés adaptar la copia como borrador antes de que la vea el alumno.</small></span></label>
+  if (editing && student) return <RoutineEditor student={student} actor={userProfile} initialRoutine={template} initialRevision={revision} sourceTemplateId={template.id} assignmentMode onClose={onClose} onSaved={onSaved} />;
+  return <Modal title="Asignar rutina a un alumno" onClose={onClose}><form onSubmit={continueToEditor}><Notice error>{error}</Notice><div className="training-assignment-summary"><span className="training-eyebrow">RUTINA GENÉRICA</span><h3>{template.nombre}</h3><p className="training-muted">Primero vas a poder revisar y adaptar una copia. La plantilla original no cambia.</p></div>
+    {loading ? <p role="status">Cargando alumnos de {activeSede?.nombre}…</p> : !students.length ? <Empty title="Sin alumnos activos">No tenés alumnos asignados en la sede activa. Cambiá de sede desde Alumnos.</Empty> : <fieldset className="training-fieldset">
+      <Field label={`Alumno · ${activeSede?.nombre || ''}`}><select className="form-input" required value={selected} onChange={(event) => { setSelected(event.target.value); setDraftLoading(true); setRevision(0); setError(''); }}><option value="">Seleccioná un alumno</option>{students.map((item) => <option key={item.id} value={item.id}>{item.nombre} · DNI {item.dni || 'sin registrar'}</option>)}</select></Field>
       {!!revision && <Notice>Se reemplazará el borrador de trabajo del alumno. Las publicaciones anteriores se conservarán en el historial.</Notice>}
-      {student?.rutinaActivaId && publish && <p className="training-muted">Esta publicación pasará a ser la rutina activa del alumno.</p>}
-      {student && !student.userId && <Notice>El alumno todavía no tiene cuenta de acceso vinculada. Asigná como borrador o pedí al administrador que vincule su cuenta antes de publicar.</Notice>}
+      {student?.rutinaActivaId && <p className="training-muted">Si publicás la copia, pasará a ser la rutina activa del alumno.</p>}
+      {student && !student.userId && <Notice>El alumno todavía no tiene cuenta de acceso vinculada. Podrás asignar la copia como borrador, pero no publicarla.</Notice>}
     </fieldset>}
-    <div className="training-modal-actions"><button type="button" className="btn-secondary" disabled={busy} onClick={onClose}>Cancelar</button><button className="btn-primary" disabled={busy || loading || draftLoading || !student || (publish && !student.userId)}>{busy ? 'Asignando…' : 'Asignar rutina'}</button></div>
+    <div className="training-modal-actions"><button type="button" className="btn-secondary" onClick={onClose}>Cancelar</button><button className="btn-primary" disabled={loading || draftLoading || !student}>Revisar y adaptar</button></div>
   </form></Modal>;
 }
 

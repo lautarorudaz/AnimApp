@@ -35,7 +35,7 @@ test('reception lists active teachers only within its sites', async () => {
   await assertFails(getDoc(doc(db, 'users', 'admin')));
 });
 
-test('reception persists assignment by UID and cannot assign outside the site or change login identity', async () => {
+test('reception persists assignment by UID and cannot assign outside the site or forge a login identity', async () => {
   const db = dbFor('reception');
   const data = { nombre: 'Jorge Prueba', dni: '20342564', email: 'jorge@example.test', telefono: '112233', profesorId: 'teacher', sedeId: 'moreno', userId: '', objetivo: '', activo: true, active: true, estado: 'Activo', creadoEn: serverTimestamp(), actualizadoEn: serverTimestamp() };
   await assertSucceeds(setDoc(doc(db, 'alumnos', 'reception-pupil'), data));
@@ -46,6 +46,41 @@ test('reception persists assignment by UID and cannot assign outside the site or
   await assertSucceeds(updateDoc(doc(db, 'alumnos', 'reception-pupil'), { profesorId: 'other', actualizadoEn: serverTimestamp() }));
   await assertFails(updateDoc(doc(db, 'alumnos', 'reception-pupil'), { profesorId: 'foreign-teacher', actualizadoEn: serverTimestamp() }));
   await assertFails(updateDoc(doc(db, 'alumnos', 'reception-pupil'), { userId: 'student', actualizadoEn: serverTimestamp() }));
+});
+
+test('reception can create and link a validated student account within its site', async () => {
+  const db = dbFor('reception');
+  const linked = writeBatch(db);
+  linked.set(doc(db, 'users', 'reception-created-user'), {
+    uid: 'reception-created-user', nombre: 'Cuenta Recepción', email: 'cuenta@example.test', rol: 'alumno', role: 'alumno',
+    sedes: ['moreno'], sedeIds: ['moreno'], activo: true, active: true, creadoEn: serverTimestamp()
+  });
+  linked.set(doc(db, 'alumnos', 'reception-created-pupil'), {
+    nombre: 'Cuenta Recepción', dni: '33444555', email: 'cuenta@example.test', telefono: '112233', profesorId: 'teacher',
+    sedeId: 'moreno', userId: 'reception-created-user', objetivo: '', activo: true, active: true, estado: 'Activo',
+    creadoEn: serverTimestamp(), actualizadoEn: serverTimestamp()
+  });
+  await assertSucceeds(linked.commit());
+
+  const pending = writeBatch(db);
+  pending.set(doc(db, 'users', 'reception-linked-user'), {
+    uid: 'reception-linked-user', nombre: 'Jorge Prueba', email: 'jorge@example.test', rol: 'alumno', role: 'alumno',
+    sedes: ['moreno'], sedeIds: ['moreno'], activo: true, active: true, creadoEn: serverTimestamp()
+  });
+  pending.update(doc(db, 'alumnos', 'reception-pupil'), { userId: 'reception-linked-user', actualizadoEn: serverTimestamp() });
+  await assertSucceeds(pending.commit());
+
+  const wrongSite = writeBatch(db);
+  wrongSite.set(doc(db, 'users', 'foreign-created-user'), {
+    uid: 'foreign-created-user', nombre: 'Otra sede', email: 'otra@example.test', rol: 'alumno',
+    sedes: ['edison'], sedeIds: ['edison'], activo: true, active: true
+  });
+  wrongSite.set(doc(db, 'alumnos', 'foreign-created-pupil'), {
+    nombre: 'Otra sede', dni: '', email: 'otra@example.test', telefono: '', profesorId: '', sedeId: 'edison',
+    userId: 'foreign-created-user', objetivo: '', activo: true, active: true, estado: 'Activo',
+    creadoEn: serverTimestamp(), actualizadoEn: serverTimestamp()
+  });
+  await assertFails(wrongSite.commit());
 });
 
 test('professor lists only assigned students in an allowed site, including a second site', async () => {

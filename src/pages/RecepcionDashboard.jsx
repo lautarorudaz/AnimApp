@@ -18,7 +18,7 @@ import {
 import SedeSwitcher from '../components/SedeSwitcher';
 import { getSedeLabel } from '../constants/appData';
 import { useAuth } from '../context/auth';
-import { deactivateReceptionStudent, saveReceptionStudent, watchReceptionStudents, watchSedeTeachers } from '../features/routines/receptionData';
+import { createReceptionStudentAccess, deactivateReceptionStudent, saveReceptionStudent, watchReceptionStudents, watchSedeTeachers } from '../features/routines/receptionData';
 import { friendlyError, isStudentActive } from '../features/routines/model';
 import { Field, Modal, Notice } from '../features/routines/Workspace';
 
@@ -39,7 +39,8 @@ const emptyAlumnoForm = {
   dni: '',
   email: '',
   telefono: '',
-  profesorId: ''
+  profesorId: '',
+  password: ''
 };
 
 const emptyProductForm = {
@@ -73,6 +74,7 @@ const RecepcionDashboard = () => {
   const [savingStudent, setSavingStudent] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
+  const [creatingStudentAccess, setCreatingStudentAccess] = useState(false);
   const [studentForm, setStudentForm] = useState(emptyAlumnoForm);
 
   const [stockItems, setStockItems] = useState(initialStock);
@@ -120,14 +122,16 @@ const RecepcionDashboard = () => {
 
   const stockBajoCount = stockBySede.filter((item) => item.stockActual <= item.stockMinimo).length;
 
-  const handleOpenStudentModal = (student = null) => {
+  const handleOpenStudentModal = (student = null, createAccess = !student) => {
     setEditingStudent(student);
+    setCreatingStudentAccess(createAccess);
     setStudentForm(student ? {
       nombre: student.nombre || '',
       dni: student.dni || '',
       email: student.email || '',
       telefono: student.telefono || '',
-      profesorId: student.profesorId || ''
+      profesorId: student.profesorId || '',
+      password: ''
     } : emptyAlumnoForm);
     setStudentError('');
     setShowStudentModal(true);
@@ -141,8 +145,13 @@ const RecepcionDashboard = () => {
     }
     setSavingStudent(true); setStudentError('');
     try {
-      await saveReceptionStudent(studentForm, editingStudent?.id, activeSedeId);
-      setStudentNotice('Alumno guardado. La asignación ya está disponible para el profesor.');
+      if (creatingStudentAccess) {
+        await createReceptionStudentAccess(studentForm, editingStudent?.id, activeSedeId);
+        setStudentNotice('Alumno guardado con acceso vinculado. Ya puede ingresar a su vista y la asignación está disponible para el profesor.');
+      } else {
+        await saveReceptionStudent(studentForm, editingStudent?.id, activeSedeId);
+        setStudentNotice('Alumno guardado. La asignación ya está disponible para el profesor.');
+      }
       setShowStudentModal(false); setEditingStudent(null);
     } catch (error) { setStudentError(friendlyError(error)); }
     finally { setSavingStudent(false); }
@@ -339,6 +348,9 @@ const RecepcionDashboard = () => {
                         <td style={{ padding: '1rem 1.5rem' }}>
                           <div style={{ fontSize: '0.85rem', color: '#fff' }}>{alumno.email}</div>
                           <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>{alumno.telefono}</div>
+                          <div style={{ fontSize: '0.75rem', marginTop: '0.35rem', color: alumno.userId ? 'var(--accent-cyan)' : '#fda4af' }}>
+                            {alumno.userId ? 'Acceso vinculado' : 'Acceso pendiente'}
+                          </div>
                         </td>
                         <td style={{ padding: '1rem 1.5rem' }}>
                           <span className="badge-role" style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-cyan)' }}>
@@ -350,7 +362,10 @@ const RecepcionDashboard = () => {
                         </td>
                         <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
-                            <button onClick={() => handleOpenStudentModal(alumno)} className="btn-secondary" style={{ padding: '0.45rem 0.8rem', fontSize: '0.8rem' }}>
+                            {!alumno.userId && <button onClick={() => handleOpenStudentModal(alumno, true)} className="btn-primary" style={{ padding: '0.45rem 0.8rem', fontSize: '0.8rem' }}>
+                              <UserCheck size={15} /> Crear acceso
+                            </button>}
+                            <button onClick={() => handleOpenStudentModal(alumno, false)} className="btn-secondary" style={{ padding: '0.45rem 0.8rem', fontSize: '0.8rem' }}>
                               <Edit3 size={15} /> Editar
                             </button>
                             <button onClick={() => handleDeleteStudent(alumno.id)} style={{ background: 'rgba(239, 68, 68, 0.1)', color: '#f87171', border: '1px solid rgba(239, 68, 68, 0.3)', padding: '0.45rem 0.6rem', borderRadius: '6px' }}>
@@ -473,26 +488,27 @@ const RecepcionDashboard = () => {
         )}
 
         {showStudentModal && (
-          <Modal title={editingStudent ? 'Editar alumno' : 'Inscribir alumno'} busy={savingStudent} onClose={() => setShowStudentModal(false)}>
+          <Modal title={creatingStudentAccess ? editingStudent ? `Crear acceso · ${editingStudent.nombre}` : 'Inscribir alumno' : 'Editar alumno'} busy={savingStudent} onClose={() => setShowStudentModal(false)}>
               <form onSubmit={handleSaveStudent}>
                 <Notice error>{studentError || teachersError}</Notice>
                 <p className="training-muted" style={{ marginBottom: '1rem' }}>{activeSede?.titulo}</p>
                 <fieldset className="training-fieldset" disabled={savingStudent}>
                   {[['nombre', 'Nombre completo'], ['dni', 'DNI'], ['email', 'Correo electrónico'], ['telefono', 'Teléfono']].map(([key, label]) => <Field key={key} label={label}><input type={key === 'email' ? 'email' : 'text'} className="form-input" maxLength={120} value={studentForm[key]} onChange={(event) => setStudentForm({ ...studentForm, [key]: event.target.value })} required /></Field>)}
+                  {creatingStudentAccess && <Field label="Contraseña inicial"><input required type="password" className="form-input" minLength={8} autoComplete="new-password" value={studentForm.password} onChange={(event) => setStudentForm({ ...studentForm, password: event.target.value })} /></Field>}
                   <Field label="Profesor asignado"><select className="form-input" value={studentForm.profesorId} disabled={teachersLoading || !!teachersError} onChange={(event) => setStudentForm({ ...studentForm, profesorId: event.target.value })}>
                     <option value="">{teachersLoading ? 'Cargando profesores…' : 'Sin asignar'}</option>
                     {studentForm.profesorId && !profesores.some((teacher) => teacher.id === studentForm.profesorId) && <option value={studentForm.profesorId} disabled>Profesor anterior no disponible en esta sede</option>}
                     {profesores.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.nombre || teacher.email}</option>)}
                   </select></Field>
                   {!teachersLoading && !teachersError && !profesores.length && <p className="training-muted">No hay profesores activos en esta sede. Podés guardar al alumno sin asignar y asignarlo después.</p>}
-                  {!editingStudent && <p className="training-muted">Se creará la ficha del alumno. El administrador debe vincular su cuenta de acceso para que pueda consultar rutinas.</p>}
+                  {creatingStudentAccess && <p className="training-muted">Se creará la cuenta de acceso, la ficha del alumno y su vínculo con esta sede. La sesión de Recepción seguirá abierta.</p>}
                 </fieldset>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
                   <button type="button" className="btn-secondary" disabled={savingStudent} style={{ flex: 1 }} onClick={() => setShowStudentModal(false)}>
                     Cancelar
                   </button>
                   <button type="submit" className="btn-primary" disabled={savingStudent || teachersLoading || !!teachersError || !activeSedeId} style={{ flex: 1, background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }}>
-                    {savingStudent ? 'Guardando…' : 'Guardar alumno'}
+                    {savingStudent ? 'Guardando…' : creatingStudentAccess ? editingStudent ? 'Crear acceso' : 'Crear alumno' : 'Guardar cambios'}
                   </button>
                 </div>
               </form>

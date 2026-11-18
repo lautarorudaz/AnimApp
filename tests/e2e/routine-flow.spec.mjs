@@ -172,6 +172,12 @@ test('professor drafts and publishes; student sees current routine and immutable
 });
 
 test('reception chooses teachers by site and persists the assignment after reload', async ({ page }) => {
+  await environment.withSecurityRulesDisabled(async (context) => {
+    await setDoc(doc(context.firestore(), 'alumnos', 'reception-pending'), {
+      nombre: 'Daniela Pendiente', dni: '41258652', email: 'daniela-pending@animapp.test', telefono: '3624857412',
+      profesorId: ids.teacher, sedeId: 'moreno', userId: '', objetivo: '', activo: true, active: true, estado: 'Activo'
+    });
+  });
   await login(page, 'reception');
   await page.getByRole('button', { name: 'Nuevo alumno', exact: true }).click();
   const teachers = page.getByLabel('Profesor asignado', { exact: true });
@@ -183,16 +189,18 @@ test('reception chooses teachers by site and persists the assignment after reloa
   await page.getByLabel('DNI', { exact: true }).fill('20342564');
   await page.getByLabel('Correo electrónico', { exact: true }).fill('jorge@animapp.test');
   await page.getByLabel('Teléfono', { exact: true }).fill('362477473');
+  await page.getByLabel('Contraseña inicial', { exact: true }).fill(password);
   await teachers.selectOption({ label: 'Profesor de prueba' });
-  await page.getByRole('button', { name: 'Guardar alumno', exact: true }).click();
+  await page.getByRole('button', { name: 'Crear alumno', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
   await page.reload();
   const row = page.getByRole('row').filter({ hasText: 'Jorge Prueba' });
   await expect(row).toContainText('Profesor de prueba');
+  await expect(row).toContainText('Acceso vinculado');
   await row.getByRole('button', { name: 'Editar', exact: true }).click();
   await expect(teachers).toHaveValue(ids.teacher);
   await teachers.selectOption({ label: 'Profesora Nueva' });
-  await page.getByRole('button', { name: 'Guardar alumno', exact: true }).click();
+  await page.getByRole('button', { name: 'Guardar cambios', exact: true }).click();
   await expect(row).toContainText('Profesora Nueva');
   await page.locator('.sede-switcher select').selectOption('edison');
   await expect(row).toHaveCount(0);
@@ -200,16 +208,16 @@ test('reception chooses teachers by site and persists the assignment after reloa
   await expect(teachers).toBeEnabled();
   expect(await teachers.locator('option').allTextContents()).toContain('Profesor solo Edison');
   await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
-  await page.getByRole('button', { name: 'Cerrar sesion', exact: true }).click();
-  await login(page, 'admin');
-  await page.getByRole('button', { name: 'Crear cuenta', exact: true }).click();
-  await page.getByLabel('Nombre completo', { exact: true }).fill('Jorge Prueba');
-  await page.getByLabel('Correo electrónico', { exact: true }).fill('jorge@animapp.test');
+  await page.locator('.sede-switcher select').selectOption('moreno');
+  const pendingRow = page.getByRole('row').filter({ hasText: 'Daniela Pendiente' });
+  await expect(pendingRow).toContainText('Acceso pendiente');
+  await pendingRow.getByRole('button', { name: 'Crear acceso', exact: true }).click();
+  await expect(page.getByLabel('Correo electrónico', { exact: true })).toHaveValue('daniela-pending@animapp.test');
   await page.getByLabel('Contraseña inicial', { exact: true }).fill(password);
-  await page.getByRole('checkbox', { name: 'Moreno', exact: true }).check();
-  await page.getByRole('dialog').getByRole('button', { name: 'Crear cuenta', exact: true }).click();
+  await page.getByRole('dialog').getByRole('button', { name: 'Crear acceso', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
-  await expect(page.getByRole('heading', { name: 'Jorge Prueba', exact: true })).toHaveCount(1);
+  await expect(pendingRow).toContainText('Acceso vinculado');
+  await page.getByRole('button', { name: 'Cerrar sesion', exact: true }).click();
   await environment.withSecurityRulesDisabled(async (context) => {
     const rows = await getDocs(query(collection(context.firestore(), 'alumnos'), where('email', '==', 'jorge@animapp.test')));
     expect(rows.size).toBe(1);
@@ -217,6 +225,13 @@ test('reception chooses teachers by site and persists the assignment after reloa
     expect(rows.docs[0].data().dni).toBe('20342564');
     expect(rows.docs[0].data().profesorId).not.toBe(ids.teacher);
   });
+  await page.goto('/login');
+  await page.locator('input[type="email"]').fill('jorge@animapp.test');
+  await page.locator('input[type="password"]').fill(password);
+  await page.getByRole('button', { name: 'Ingresar a Plataforma AnimApp' }).click();
+  await expect(page).toHaveURL(/\/alumno$/);
+  await expect(page.getByRole('heading', { name: 'Mi rutina', exact: true })).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Todavía no tenés una rutina activa', exact: true })).toBeVisible();
 });
 
 test('exercise catalog, shared routine templates and independent student assignments work across teachers', async ({ page, browser }) => {
@@ -263,14 +278,24 @@ test('exercise catalog, shared routine templates and independent student assignm
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   await expect(otherPage.getByRole('heading', { name: 'Plan espalda reutilizable', exact: true })).toBeVisible();
   await expect(otherPage.getByRole('button', { name: 'Editar', exact: true })).toHaveCount(0);
-  await page.getByRole('button', { name: 'Asignar a alumno', exact: true }).click();
-  await page.getByLabel('Alumno · Moreno', { exact: true }).selectOption('library-pupil');
-  await page.getByRole('button', { name: 'Asignar rutina', exact: true }).click();
+  await page.getByRole('link', { name: 'Alumnos', exact: true }).click();
+  const assignedPupilCard = page.locator('.training-student-row').filter({ hasText: 'Lucía Biblioteca' });
+  await assignedPupilCard.getByRole('button', { name: 'Asignar genérica', exact: true }).click();
+  await page.locator('.training-template-option').filter({ hasText: 'Plan espalda reutilizable' }).click();
+  await expect(page.getByLabel('Alumno · Moreno', { exact: true })).toHaveValue('library-pupil');
+  await page.getByRole('button', { name: 'Revisar y adaptar', exact: true }).click();
+  await expect(page.getByRole('heading', { name: 'Adaptar rutina · Lucía Biblioteca', exact: true })).toBeVisible();
+  await page.getByLabel('Nombre de la rutina', { exact: true }).fill('Plan espalda adaptado para Lucía');
+  await page.getByRole('button', { name: 'Asignar y publicar', exact: true }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
+  await expect(assignedPupilCard).toContainText('Rutina publicada');
+  await expect(assignedPupilCard.getByRole('button', { name: 'Editar rutina', exact: true })).toBeVisible();
+  await expect(page.locator('.training-stats .training-card').filter({ hasText: 'Con rutina publicada' }).locator('strong')).toHaveText('1');
+  await page.getByRole('link', { name: 'Rutinas', exact: true }).click();
   const studentContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const studentPage = await studentContext.newPage(); await login(studentPage, 'student');
   await studentPage.getByLabel('Sede / ficha de alumno', { exact: true }).selectOption('library-pupil');
-  await expect(studentPage.getByRole('heading', { name: 'Plan espalda reutilizable', exact: true })).toBeVisible();
+  await expect(studentPage.getByRole('heading', { name: 'Plan espalda adaptado para Lucía', exact: true })).toBeVisible();
   await expect(studentPage.getByRole('heading', { name: 'Remo en polea', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Editar', exact: true }).click();
   await page.getByLabel('Nombre de la rutina', { exact: true }).fill('Plan espalda actualizado');
@@ -279,7 +304,7 @@ test('exercise catalog, shared routine templates and independent student assignm
   await page.getByRole('button', { name: 'Cerrar', exact: true }).click();
   await studentPage.reload();
   await studentPage.getByLabel('Sede / ficha de alumno', { exact: true }).selectOption('library-pupil');
-  await expect(studentPage.getByRole('heading', { name: 'Plan espalda reutilizable', exact: true })).toBeVisible();
+  await expect(studentPage.getByRole('heading', { name: 'Plan espalda adaptado para Lucía', exact: true })).toBeVisible();
   await expect(otherPage.getByRole('heading', { name: 'Plan espalda actualizado', exact: true })).toBeVisible();
   await otherPage.getByRole('button', { name: 'Duplicar', exact: true }).click();
   await otherPage.getByLabel('Nombre de la rutina', { exact: true }).fill('Copia personal de espalda');

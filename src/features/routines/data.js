@@ -71,17 +71,13 @@ export async function saveRoutine({ student, actor, routine, publish, expectedRe
     assertAssigned(pupil, actor);
     if (!isStudentActive(pupil)) throw new Error('No se puede guardar una rutina para un alumno dado de baja.');
     if (publish && !pupil.userId) throw new Error('El administrador debe vincular la cuenta del alumno antes de publicar. Podés asignar la rutina como borrador.');
-    let content = routine;
     if (sourceTemplateId) {
       if (!templateSnapshot.exists() || templateSnapshot.data().activo === false) throw new Error('La rutina genérica ya no está disponible.');
-      content = normalizeRoutine(templateSnapshot.data());
-      const templateValidation = validateRoutine(content, publish);
-      if (templateValidation) throw new Error(templateValidation);
     }
     const revision = draftSnapshot.exists() ? draftSnapshot.data().revision || 0 : 0;
     if (revision !== expectedRevision) throw new Error('Otro editor actualizó el borrador. Cerrá y volvé a abrir la rutina para cargar la última versión. Tus cambios siguen en pantalla.');
     const payload = {
-      ...content, alumnoId: student.id, alumnoUserId: pupil.userId || '',
+      ...normalizeRoutine(routine), alumnoId: student.id, alumnoUserId: pupil.userId || '',
       profesorId: pupil.profesorId, sedeId: pupil.sedeId, actualizadoPor: actor.uid,
       actualizadoEn: serverTimestamp(), revision: revision + 1,
       ...(sourceTemplateId ? { origenRutinaId: sourceTemplateId, origenRutinaRevision: templateSnapshot.data().revision || 0 } : {})
@@ -92,5 +88,5 @@ export async function saveRoutine({ student, actor, routine, publish, expectedRe
       transaction.update(studentRef, { rutinaActivaId: publishedRef.id, actualizadoEn: serverTimestamp() });
     }
   });
-  return expectedRevision + 1;
+  return { revision: expectedRevision + 1, rutinaActivaId: publishedRef?.id || '' };
 }

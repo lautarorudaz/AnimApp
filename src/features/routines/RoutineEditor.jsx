@@ -7,9 +7,12 @@ import RoutineViewer from './RoutineViewer';
 import { saveGenericRoutine } from './libraryData';
 import { isShared } from './libraryModel';
 
-export default function RoutineEditor({ student, actor, draft, published, onClose, onSaved, templateMode = false, template }) {
-  const [routine, setRoutine] = useState(() => normalizeRoutine(template || draft || published || student?.rutinaActiva, student));
-  const [revision, setRevision] = useState(template?.revision || draft?.revision || 0);
+export default function RoutineEditor({
+  student, actor, draft, published, onClose, onSaved, templateMode = false, template,
+  assignmentMode = false, initialRoutine, initialRevision, sourceTemplateId = ''
+}) {
+  const [routine, setRoutine] = useState(() => normalizeRoutine(initialRoutine || template || draft || published || student?.rutinaActiva, student));
+  const [revision, setRevision] = useState(initialRevision ?? (templateMode ? template?.revision : draft?.revision) ?? 0);
   const [templateId, setTemplateId] = useState(template?.id || '');
   const [shared, setShared] = useState(isShared(template || {}));
   const [dirty, setDirty] = useState(false);
@@ -52,10 +55,13 @@ export default function RoutineEditor({ student, actor, draft, published, onClos
         const message = shared ? 'Rutina genérica guardada y compartida con los profesores.' : 'Rutina genérica privada guardada.';
         setNotice(message); onSaved(message); return;
       }
-      const nextRevision = await saveRoutine({ student, actor, routine, publish, expectedRevision: revision });
-      setRevision(nextRevision); setDirty(false);
-      const message = publish ? 'Rutina publicada. El alumno ya puede verla; la versión anterior queda en su historial.' : 'Borrador guardado. El alumno sigue viendo la última versión publicada.';
-      setNotice(message); onSaved(message);
+      const result = await saveRoutine({ student, actor, routine, publish, expectedRevision: revision, sourceTemplateId });
+      setRevision(result.revision); setDirty(false);
+      const message = assignmentMode
+        ? publish ? 'Rutina adaptada, asignada y publicada para el alumno.' : 'Rutina adaptada y asignada como borrador.'
+        : publish ? 'Rutina publicada. El alumno ya puede verla; la versión anterior queda en su historial.' : 'Borrador guardado. El alumno sigue viendo la última versión publicada.';
+      setNotice(message); onSaved(message, { studentId: student.id, rutinaActivaId: result.rutinaActivaId, publish });
+      if (assignmentMode) onClose();
     } catch (err) { setError(friendlyError(err)); } finally { setBusy(false); }
   };
   const addExercise = (exercise) => {
@@ -83,9 +89,12 @@ export default function RoutineEditor({ student, actor, draft, published, onClos
   };
   const categories = [...new Set(library.map((item) => String(item.categoria)).filter(Boolean))];
   const filtered = library.filter((item) => (!item.etapa || item.etapa === picker) && `${item.nombre} ${item.categoria}`.toLocaleLowerCase('es').includes(search.toLocaleLowerCase('es')) && (!category || String(item.categoria) === category));
-  return <Modal title={templateMode ? templateId ? 'Editar rutina genérica' : 'Nueva rutina genérica' : `Rutina · ${student.nombre}`} onClose={close} wide busy={busy}>
-    <div className="training-editor-intro"><span className="training-badge">{dirty ? 'Cambios sin guardar' : 'Borrador de trabajo'}</span><button className="btn-secondary" type="button" onClick={() => setPreview(!preview)}><Eye size={16} />{preview ? 'Volver al editor' : 'Vista del alumno'}</button></div>
+  const title = templateMode ? templateId ? 'Editar rutina genérica' : 'Nueva rutina genérica' : assignmentMode ? `Adaptar rutina · ${student.nombre}` : `Rutina · ${student.nombre}`;
+  return <Modal title={title} onClose={close} wide busy={busy}>
+    <div className="training-editor-intro"><span className="training-badge">{dirty ? 'Cambios sin guardar' : assignmentMode ? 'Copia lista para asignar' : 'Borrador de trabajo'}</span><button className="btn-secondary" type="button" onClick={() => setPreview(!preview)}><Eye size={16} />{preview ? 'Volver al editor' : 'Vista del alumno'}</button></div>
     <Notice error>{error}</Notice><Notice>{notice}</Notice>
+    {assignmentMode && <Notice>Podés cambiar cualquier parte de esta copia antes de asignarla. La rutina genérica original no se modificará.</Notice>}
+    {!templateMode && !student.userId && <Notice>El alumno todavía no tiene una cuenta vinculada. Podés guardar el borrador, pero no publicarlo hasta que el administrador vincule su acceso.</Notice>}
     <fieldset disabled={busy} className="training-fieldset">
       {preview ? <RoutineViewer key={JSON.stringify(routine)} data={routine} /> : <>
         {templateMode && <label className="training-sharing"><input type="checkbox" checked={shared} onChange={(event) => { setShared(event.target.checked); setDirty(true); }} /><span><strong>Compartir con otros profesores</strong><small>{shared ? 'Otros profesores podrán verla y copiarla para sus alumnos.' : 'Solo vos podrás ver y asignar esta rutina.'}</small></span></label>}
@@ -127,6 +136,6 @@ export default function RoutineEditor({ student, actor, draft, published, onClos
         </section>}
       </>}
     </fieldset>
-    <footer className="training-editor-footer"><div><Check size={16} /><span>{busy ? 'Guardando en Firebase…' : templateMode ? 'Cada alumno recibe una copia independiente de esta rutina.' : 'Solo las versiones publicadas son visibles para el alumno.'}</span></div><div className="training-actions"><button className="btn-secondary" disabled={busy} onClick={close}>Cerrar</button>{templateMode ? <button className="btn-primary" disabled={busy} onClick={() => save(false)}><Save size={16} />Guardar rutina genérica</button> : <><button className="btn-secondary" disabled={busy} onClick={() => save(false)}><Save size={16} />Guardar borrador</button><button className="btn-primary" disabled={busy} onClick={() => save(true)}><Send size={16} />Publicar rutina</button></>}</div></footer>
+    <footer className="training-editor-footer"><div><Check size={16} /><span>{busy ? 'Guardando en Firebase…' : templateMode ? 'Cada alumno recibe una copia independiente de esta rutina.' : assignmentMode ? 'Confirmá cuando la copia esté lista para el alumno.' : 'Solo las versiones publicadas son visibles para el alumno.'}</span></div><div className="training-actions"><button className="btn-secondary" disabled={busy} onClick={close}>Cerrar</button>{templateMode ? <button className="btn-primary" disabled={busy} onClick={() => save(false)}><Save size={16} />Guardar rutina genérica</button> : <><button className="btn-secondary" disabled={busy} onClick={() => save(false)}><Save size={16} />{assignmentMode ? 'Asignar borrador' : 'Guardar borrador'}</button><button className="btn-primary" disabled={busy || !student.userId} onClick={() => save(true)}><Send size={16} />{assignmentMode ? 'Asignar y publicar' : 'Publicar rutina'}</button></>}</div></footer>
   </Modal>;
 }
