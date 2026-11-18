@@ -1,0 +1,9 @@
+{
+  "indexes": [
+    { "collectionGroup": "users", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "rol", "order": "ASCENDING" }, { "fieldPath": "activo", "order": "ASCENDING" }, { "fieldPath": "sedeIds", "arrayConfig": "CONTAINS" }] },
+    { "collectionGroup": "alumnos", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "sedeId", "order": "ASCENDING" }, { "fieldPath": "profesorId", "order": "ASCENDING" }] },
+    { "collectionGroup": "rutinas", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "alumnoId", "order": "ASCENDING" }, { "fieldPath": "sedeId", "order": "ASCENDING" }] },
+    { "collectionGroup": "rutinas", "queryScope": "COLLECTION", "fields": [{ "fieldPath": "alumnoUserId", "order": "ASCENDING" }, { "fieldPath": "estado", "order": "ASCENDING" }] }
+  ],
+  "fieldOverrides": []
+}

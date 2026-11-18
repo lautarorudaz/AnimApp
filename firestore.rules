@@ -54,47 +54,173 @@ service cloud.firestore {
       return profileHasSede(sedeId) && hasRole('recepcionista');
     }
 
+    function assignedTo(data) {
+      return hasRole('profesor')
+        && data.profesorId == request.auth.uid
+        && profileHasSede(data.sedeId);
+    }
+
+    function validTeacherAssignment(data) {
+      return data.profesorId == '' || (
+        get(userProfilePath(data.profesorId)).data.rol == 'profesor'
+        && get(userProfilePath(data.profesorId)).data.activo == true
+        && get(userProfilePath(data.profesorId)).data.get('active', true) != false
+        && get(userProfilePath(data.profesorId)).data.get('sedeIds', get(userProfilePath(data.profesorId)).data.get('sedes', [])).hasAny([data.sedeId])
+      );
+    }
+
+    function receptionProfileUpdate() {
+      return isRecepcionForSede(resource.data.sedeId)
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['nombre', 'dni', 'email', 'telefono', 'profesorId', 'activo', 'active', 'estado', 'actualizadoEn'])
+        && request.resource.data.actualizadoEn == request.time
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['profesorId']) || validTeacherAssignment(request.resource.data))
+        && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['activo', 'active', 'estado'])
+          || (request.resource.data.activo == false && request.resource.data.active == false && request.resource.data.estado == 'Baja'));
+    }
+
+    function alumno(alumnoId) {
+      return get(/databases/$(database)/documents/alumnos/$(alumnoId)).data;
+    }
+
+    function activeAlumno(data) {
+      return data.get('activo', true) != false
+        && data.get('active', true) != false
+        && !(data.get('estado', 'Activo') in ['Baja', 'Inactivo']);
+    }
+
+    function validRoutine(data) {
+      let student = alumno(data.alumnoId);
+      return data.keys().hasAll(['nombre', 'objetivo', 'aclaraciones', 'semanas', 'alumnoId', 'alumnoUserId', 'profesorId', 'sedeId', 'estado', 'revision', 'actualizadoPor', 'actualizadoEn'])
+        && data.nombre is string && data.nombre.size() > 0 && data.nombre.size() <= 120
+        && data.objetivo is string && data.aclaraciones is string
+        && data.semanas is list && data.semanas.size() > 0
+        && data.revision is int && data.revision > 0
+        && data.alumnoUserId == student.userId
+        && data.profesorId == student.profesorId
+        && data.sedeId == student.sedeId
+        && activeAlumno(student)
+        && data.actualizadoPor == request.auth.uid
+        && data.actualizadoEn == request.time;
+    }
+
+    function validActiveRoutine(data, alumnoId) {
+      let routine = getAfter(/databases/$(database)/documents/rutinas/$(data.rutinaActivaId)).data;
+      return activeAlumno(data)
+        && routine.alumnoId == alumnoId
+        && routine.alumnoUserId == data.userId
+        && routine.sedeId == data.sedeId
+        && routine.estado == 'publicada';
+    }
+
     match /sedes/{sedeId} {
       allow read: if signedIn();
       allow write: if isAdmin();
     }
 
     match /users/{userId} {
-      allow read: if isAdmin() || (signedIn() && request.auth.uid == userId);
-      allow create, update, delete: if isAdmin();
+      allow read: if isAdmin() || (signedIn() && request.auth.uid == userId)
+        || (hasRole('recepcionista') && resource.data.rol in ['profesor', 'alumno'] && resource.data.activo == true
+          && resource.data.get('sedeIds', resource.data.get('sedes', [])).hasAny(profile().get('sedeIds', profile().get('sedes', []))));
+      allow create: if isAdmin() || (
+        hasRole('recepcionista') && request.resource.data.uid == userId && request.resource.data.rol == 'alumno'
+        && request.resource.data.sedeIds.size() == 1
+        && request.resource.data.sedeIds.hasAny(profile().get('sedeIds', profile().get('sedes', [])))
+      );
+      allow update: if isAdmin() || (
+        hasRole('recepcionista') && resource.data.rol == 'alumno'
+        && resource.data.get('sedeIds', resource.data.get('sedes', [])).hasAny(profile().get('sedeIds', profile().get('sedes', [])))
+        && request.resource.data.diff(resource.data).affectedKeys().hasOnly(['activo', 'active', 'eliminado', 'updatedAt'])
+      );
+      allow delete: if isAdmin();
     }
 
     match /alumnos/{alumnoId} {
       allow read: if isAdmin()
-        || (signedIn() && request.auth.uid == resource.data.userId)
-        || isStaffForSede(resource.data.sedeId);
+        || (isActive() && request.auth.uid == resource.data.userId)
+        || assignedTo(resource.data)
+        || isRecepcionForSede(resource.data.sedeId);
 
-      allow create: if isAdmin() || isStaffForSede(request.resource.data.sedeId);
+      allow delete: if isAdmin();
+      allow create: if isAdmin() || (
+        isRecepcionForSede(request.resource.data.sedeId)
+        && request.resource.data.keys().hasOnly(['nombre', 'dni', 'email', 'telefono', 'profesorId', 'sedeId', 'userId', 'objetivo', 'activo', 'active', 'estado', 'creadoEn', 'actualizadoEn'])
+        && request.resource.data.userId == ''
+        && request.resource.data.activo == true && request.resource.data.active == true && request.resource.data.estado == 'Activo'
+        && request.resource.data.creadoEn == request.time && request.resource.data.actualizadoEn == request.time
+        && validTeacherAssignment(request.resource.data)
+      );
 
-      allow update, delete: if isAdmin()
+      allow update: if isAdmin() || receptionProfileUpdate()
         || (
-          isStaffForSede(resource.data.sedeId)
-          && request.resource.data.sedeId == resource.data.sedeId
+          assignedTo(resource.data)
+          && request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+            'nombre', 'dni', 'telefono', 'objetivo', 'activo', 'active', 'estado', 'actualizadoEn', 'rutinaActivaId',
+            'rutinaId', 'rutinaNombre', 'frecuenciaSemanal', 'rutinaIndicaciones', 'rutinaEjercicios', 'rutinaActualizadaAt', 'rutinaEstructura', 'updatedAt', 'updatedBy'
+          ])
+          && (request.resource.data.get('actualizadoEn', null) == request.time || request.resource.data.get('updatedAt', null) == request.time)
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['activo', 'active', 'estado'])
+            || (request.resource.data.activo == false && request.resource.data.active == false && request.resource.data.estado == 'Baja'))
+          && (!request.resource.data.diff(resource.data).affectedKeys().hasAny(['rutinaActivaId'])
+            || validActiveRoutine(request.resource.data, alumnoId))
         );
     }
 
     match /ejercicios/{ejercicioId} {
+      allow read: if isAdmin() || (hasRole('profesor') && (resource.data.profesorId == request.auth.uid || resource.data.privado == false));
+      allow create: if isAdmin() || (hasRole('profesor') && request.resource.data.profesorId == request.auth.uid);
+      allow update: if isAdmin() || (hasRole('profesor') && resource.data.profesorId == request.auth.uid && request.resource.data.profesorId == resource.data.profesorId);
+      allow delete: if isAdmin() || (hasRole('profesor') && resource.data.profesorId == request.auth.uid);
+    }
+
+    match /zonasMusculares/{zonaId} {
       allow read: if isActive();
-      allow create, update, delete: if isAdmin() || hasRole('profesor');
+      allow create: if hasRole('profesor') && request.resource.data.creadoPor == request.auth.uid;
+      allow update, delete: if isAdmin() || (hasRole('profesor') && resource.data.creadoPor == request.auth.uid);
+    }
+
+    match /rutinasGenericas/{rutinaId} {
+      allow read: if isAdmin() || (hasRole('profesor') && (resource.data.profesorId == request.auth.uid || resource.data.privado == false));
+      allow create: if isAdmin() || (hasRole('profesor') && request.resource.data.profesorId == request.auth.uid);
+      allow update: if isAdmin() || (hasRole('profesor') && resource.data.profesorId == request.auth.uid && request.resource.data.profesorId == resource.data.profesorId);
+      allow delete: if isAdmin() || (hasRole('profesor') && resource.data.profesorId == request.auth.uid);
     }
 
     match /rutinas/{rutinaId} {
       allow read: if isAdmin()
-        || (signedIn() && request.auth.uid == resource.data.alumnoUserId)
-        || isProfesorForSede(resource.data.sedeId);
+        || (isActive() && request.auth.uid == resource.data.alumnoUserId && (!('estado' in resource.data) || resource.data.estado == 'publicada'))
+        || (assignedTo(alumno(resource.data.alumnoId)) && resource.data.sedeId == alumno(resource.data.alumnoId).sedeId);
 
-      allow create: if isAdmin() || isProfesorForSede(request.resource.data.sedeId);
-
-      allow update, delete: if isAdmin()
+      allow create: if (isAdmin() || assignedTo(alumno(request.resource.data.alumnoId)))
+        && (
+        (!('estado' in request.resource.data)
+          && request.resource.data.profesorId == request.auth.uid
+          && request.resource.data.alumnoUserId == alumno(request.resource.data.alumnoId).userId
+          && request.resource.data.sedeId == alumno(request.resource.data.alumnoId).sedeId)
         || (
-          isProfesorForSede(resource.data.sedeId)
-          && request.resource.data.sedeId == resource.data.sedeId
-        );
+        validRoutine(request.resource.data)
+        && request.resource.data.estado == 'publicada'
+        && request.resource.data.alumnoUserId is string && request.resource.data.alumnoUserId.size() > 0
+        && request.resource.data.publicadoEn == request.time
+        && getAfter(/databases/$(database)/documents/alumnos/$(request.resource.data.alumnoId)).data.rutinaActivaId == rutinaId));
+
+      // Published versions are immutable; every publication creates a new version.
+      allow update: if isAdmin() || (
+        !('estado' in resource.data) && !('estado' in request.resource.data)
+        && resource.data.profesorId == request.auth.uid && assignedTo(alumno(resource.data.alumnoId))
+        && request.resource.data.profesorId == resource.data.profesorId
+        && request.resource.data.alumnoId == resource.data.alumnoId && request.resource.data.sedeId == resource.data.sedeId
+        && request.resource.data.alumnoUserId == resource.data.alumnoUserId
+      );
+      allow delete: if isAdmin() || (!('estado' in resource.data) && resource.data.profesorId == request.auth.uid && assignedTo(alumno(resource.data.alumnoId)));
+    }
+
+    match /rutinasBorradores/{alumnoId} {
+      allow read: if isAdmin() || assignedTo(alumno(alumnoId));
+      allow create, update: if (isAdmin() || assignedTo(alumno(alumnoId)))
+        && request.resource.data.alumnoId == alumnoId
+        && request.resource.data.estado == 'borrador'
+        && validRoutine(request.resource.data);
+      allow delete: if isAdmin();
     }
 
     match /stockItems/{itemId} {

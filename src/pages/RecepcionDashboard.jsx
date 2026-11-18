@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
   ArrowDownCircle,
@@ -18,12 +18,9 @@ import {
 import SedeSwitcher from '../components/SedeSwitcher';
 import { getSedeLabel } from '../constants/appData';
 import { useAuth } from '../context/auth';
-
-const initialAlumnos = [
-  { id: '1', nombre: 'Gonzalo Perez', dni: '39444111', email: 'gonzalo@gmail.com', telefono: '+54 9 11 5555-1111', sede: 'moreno', profesorAsignado: 'Carlos Rodriguez', estado: 'Activo' },
-  { id: '2', nombre: 'Camila Torres', dni: '41222999', email: 'camila@gmail.com', telefono: '+54 9 11 5555-2222', sede: 'edison', profesorAsignado: 'Sin asignar', estado: 'Activo' },
-  { id: '3', nombre: 'Roberto Sanchez', dni: '38111222', email: 'roberto@gmail.com', telefono: '+54 9 11 5555-3333', sede: 'general-san-martin', profesorAsignado: 'Esteban Benitez', estado: 'Activo' }
-];
+import { deactivateReceptionStudent, saveReceptionStudent, watchReceptionStudents, watchSedeTeachers } from '../features/routines/receptionData';
+import { friendlyError, isStudentActive } from '../features/routines/model';
+import { Field, Modal, Notice } from '../features/routines/Workspace';
 
 const initialStock = [
   { id: 'p1', nombre: 'Lavandina', categoria: 'Limpieza', unidad: 'litros', sede: 'moreno', stockActual: 12, stockMinimo: 5 },
@@ -42,7 +39,7 @@ const emptyAlumnoForm = {
   dni: '',
   email: '',
   telefono: '',
-  profesorAsignado: 'Sin asignar'
+  profesorId: ''
 };
 
 const emptyProductForm = {
@@ -65,7 +62,15 @@ const RecepcionDashboard = () => {
 
   const [activeSection, setActiveSection] = useState('alumnos');
   const [searchTerm, setSearchTerm] = useState('');
-  const [alumnos, setAlumnos] = useState(initialAlumnos);
+  const [alumnos, setAlumnos] = useState([]);
+  const [profesores, setProfesores] = useState([]);
+  const [teachersLoading, setTeachersLoading] = useState(true);
+  const [studentsLoading, setStudentsLoading] = useState(true);
+  const [teachersError, setTeachersError] = useState('');
+  const [studentsError, setStudentsError] = useState('');
+  const [studentError, setStudentError] = useState('');
+  const [studentNotice, setStudentNotice] = useState('');
+  const [savingStudent, setSavingStudent] = useState(false);
   const [showStudentModal, setShowStudentModal] = useState(false);
   const [editingStudent, setEditingStudent] = useState(null);
   const [studentForm, setStudentForm] = useState(emptyAlumnoForm);
@@ -81,14 +86,27 @@ const RecepcionDashboard = () => {
 
   const activeSedeId = activeSede?.id;
 
+  useEffect(() => {
+    setProfesores([]); setAlumnos([]); setTeachersError(''); setStudentsError('');
+    setTeachersLoading(true); setStudentsLoading(true); setShowStudentModal(false);
+    if (!activeSedeId) { setTeachersLoading(false); setStudentsLoading(false); return; }
+    const stopTeachers = watchSedeTeachers(activeSedeId,
+      (items) => { setProfesores(items); setTeachersLoading(false); },
+      (error) => { setTeachersError(friendlyError(error)); setTeachersLoading(false); });
+    const stopStudents = watchReceptionStudents(activeSedeId,
+      (items) => { setAlumnos(items); setStudentsLoading(false); },
+      (error) => { setStudentsError(friendlyError(error)); setStudentsLoading(false); });
+    return () => { stopTeachers(); stopStudents(); };
+  }, [activeSedeId]);
+
   const filteredAlumnos = useMemo(() => {
     return alumnos.filter((alumno) => {
       const query = searchTerm.toLowerCase().trim();
       const matchesSearch = !query
-        || alumno.nombre.toLowerCase().includes(query)
-        || alumno.dni.includes(query);
-      const matchesSede = !activeSedeId || alumno.sede === activeSedeId;
-      return matchesSearch && matchesSede;
+        || (alumno.nombre || '').toLowerCase().includes(query)
+        || String(alumno.dni || '').includes(query);
+      const matchesSede = !activeSedeId || alumno.sedeId === activeSedeId;
+      return matchesSearch && matchesSede && isStudentActive(alumno);
     });
   }, [activeSedeId, alumnos, searchTerm]);
 
@@ -105,42 +123,35 @@ const RecepcionDashboard = () => {
   const handleOpenStudentModal = (student = null) => {
     setEditingStudent(student);
     setStudentForm(student ? {
-      nombre: student.nombre,
-      dni: student.dni,
-      email: student.email,
-      telefono: student.telefono,
-      profesorAsignado: student.profesorAsignado
+      nombre: student.nombre || '',
+      dni: student.dni || '',
+      email: student.email || '',
+      telefono: student.telefono || '',
+      profesorId: student.profesorId || ''
     } : emptyAlumnoForm);
+    setStudentError('');
     setShowStudentModal(true);
   };
 
-  const handleSaveStudent = (event) => {
+  const handleSaveStudent = async (event) => {
     event.preventDefault();
-
-    if (editingStudent) {
-      setAlumnos((current) => current.map((alumno) => (
-        alumno.id === editingStudent.id ? { ...alumno, ...studentForm } : alumno
-      )));
-    } else {
-      setAlumnos((current) => [
-        ...current,
-        {
-          id: Date.now().toString(),
-          ...studentForm,
-          sede: activeSedeId,
-          estado: 'Activo'
-        }
-      ]);
+    if (!activeSedeId || teachersLoading || teachersError || savingStudent) return;
+    if (studentForm.profesorId && !profesores.some((teacher) => teacher.id === studentForm.profesorId)) {
+      setStudentError('Seleccioná un profesor activo de esta sede o dejá al alumno sin asignar.'); return;
     }
-
-    setShowStudentModal(false);
-    setEditingStudent(null);
+    setSavingStudent(true); setStudentError('');
+    try {
+      await saveReceptionStudent(studentForm, editingStudent?.id, activeSedeId);
+      setStudentNotice('Alumno guardado. La asignación ya está disponible para el profesor.');
+      setShowStudentModal(false); setEditingStudent(null);
+    } catch (error) { setStudentError(friendlyError(error)); }
+    finally { setSavingStudent(false); }
   };
 
-  const handleDeleteStudent = (id) => {
-    if (window.confirm('Esta seguro de eliminar a este alumno?')) {
-      setAlumnos((current) => current.filter((alumno) => alumno.id !== id));
-    }
+  const handleDeleteStudent = async (id) => {
+    if (!window.confirm('¿Dar de baja a este alumno conservando sus datos y rutinas?')) return;
+    try { await deactivateReceptionStudent(id, activeSedeId); setStudentNotice('Alumno dado de baja.'); }
+    catch (error) { setStudentsError(friendlyError(error)); }
   };
 
   const handleOpenProductModal = (product = null) => {
@@ -286,6 +297,8 @@ const RecepcionDashboard = () => {
 
         {activeSection === 'alumnos' && (
           <>
+            <Notice error>{studentsError}</Notice><Notice>{studentNotice}</Notice>
+            {studentsLoading && <p role="status">Cargando alumnos…</p>}
             <div style={{ marginBottom: '1.5rem', position: 'relative', maxWidth: '420px' }}>
               <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
@@ -329,11 +342,11 @@ const RecepcionDashboard = () => {
                         </td>
                         <td style={{ padding: '1rem 1.5rem' }}>
                           <span className="badge-role" style={{ background: 'rgba(6, 182, 212, 0.1)', color: 'var(--accent-cyan)' }}>
-                            {getSedeLabel(alumno.sede)}
+                            {getSedeLabel(alumno.sedeId)}
                           </span>
                         </td>
                         <td style={{ padding: '1rem 1.5rem', color: 'var(--accent-orange)', fontWeight: 500 }}>
-                          {alumno.profesorAsignado}
+                          {profesores.find((teacher) => teacher.id === alumno.profesorId)?.nombre || (alumno.profesorId ? 'Profesor no disponible' : 'Sin asignar')}
                         </td>
                         <td style={{ padding: '1rem 1.5rem', textAlign: 'right' }}>
                           <div style={{ display: 'flex', gap: '0.5rem', justifyContent: 'flex-end' }}>
@@ -460,48 +473,30 @@ const RecepcionDashboard = () => {
         )}
 
         {showStudentModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
-            <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '520px', border: '1px solid var(--border-color)' }}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
-                <h2>{editingStudent ? 'Editar alumno' : 'Inscribir alumno'}</h2>
-                <button onClick={() => setShowStudentModal(false)} style={{ background: 'none', color: 'var(--text-muted)' }}>
-                  <X size={20} />
-                </button>
-              </div>
-
+          <Modal title={editingStudent ? 'Editar alumno' : 'Inscribir alumno'} busy={savingStudent} onClose={() => setShowStudentModal(false)}>
               <form onSubmit={handleSaveStudent}>
-                <div className="form-group">
-                  <label className="form-label">Nombre completo</label>
-                  <input className="form-input" value={studentForm.nombre} onChange={(event) => setStudentForm({ ...studentForm, nombre: event.target.value })} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">DNI</label>
-                  <input className="form-input" value={studentForm.dni} onChange={(event) => setStudentForm({ ...studentForm, dni: event.target.value })} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Correo electronico</label>
-                  <input type="email" className="form-input" value={studentForm.email} onChange={(event) => setStudentForm({ ...studentForm, email: event.target.value })} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Telefono</label>
-                  <input className="form-input" value={studentForm.telefono} onChange={(event) => setStudentForm({ ...studentForm, telefono: event.target.value })} required />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Profesor asignado</label>
-                  <input className="form-input" value={studentForm.profesorAsignado} onChange={(event) => setStudentForm({ ...studentForm, profesorAsignado: event.target.value })} required />
-                </div>
-
+                <Notice error>{studentError || teachersError}</Notice>
+                <p className="training-muted" style={{ marginBottom: '1rem' }}>{activeSede?.titulo}</p>
+                <fieldset className="training-fieldset" disabled={savingStudent}>
+                  {[['nombre', 'Nombre completo'], ['dni', 'DNI'], ['email', 'Correo electrónico'], ['telefono', 'Teléfono']].map(([key, label]) => <Field key={key} label={label}><input type={key === 'email' ? 'email' : 'text'} className="form-input" maxLength={120} value={studentForm[key]} onChange={(event) => setStudentForm({ ...studentForm, [key]: event.target.value })} required /></Field>)}
+                  <Field label="Profesor asignado"><select className="form-input" value={studentForm.profesorId} disabled={teachersLoading || !!teachersError} onChange={(event) => setStudentForm({ ...studentForm, profesorId: event.target.value })}>
+                    <option value="">{teachersLoading ? 'Cargando profesores…' : 'Sin asignar'}</option>
+                    {studentForm.profesorId && !profesores.some((teacher) => teacher.id === studentForm.profesorId) && <option value={studentForm.profesorId} disabled>Profesor anterior no disponible en esta sede</option>}
+                    {profesores.map((teacher) => <option key={teacher.id} value={teacher.id}>{teacher.nombre || teacher.email}</option>)}
+                  </select></Field>
+                  {!teachersLoading && !teachersError && !profesores.length && <p className="training-muted">No hay profesores activos en esta sede. Podés guardar al alumno sin asignar y asignarlo después.</p>}
+                  {!editingStudent && <p className="training-muted">Se creará la ficha del alumno. El administrador debe vincular su cuenta de acceso para que pueda consultar rutinas.</p>}
+                </fieldset>
                 <div style={{ display: 'flex', gap: '1rem', marginTop: '2rem' }}>
-                  <button type="button" className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowStudentModal(false)}>
+                  <button type="button" className="btn-secondary" disabled={savingStudent} style={{ flex: 1 }} onClick={() => setShowStudentModal(false)}>
                     Cancelar
                   </button>
-                  <button type="submit" className="btn-primary" style={{ flex: 1, background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }}>
-                    Guardar alumno
+                  <button type="submit" className="btn-primary" disabled={savingStudent || teachersLoading || !!teachersError || !activeSedeId} style={{ flex: 1, background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }}>
+                    {savingStudent ? 'Guardando…' : 'Guardar alumno'}
                   </button>
                 </div>
               </form>
-            </div>
-          </div>
+          </Modal>
         )}
 
         {showProductModal && (

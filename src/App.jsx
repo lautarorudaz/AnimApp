@@ -6,6 +6,8 @@ import Landing from './pages/Landing';
 import Login from './pages/Login';
 import AdminDashboard from './pages/AdminDashboard';
 import ProfesorDashboard from './pages/ProfesorDashboard';
+import ProfesorExercises from './pages/ProfesorExercises';
+import ProfesorRoutines from './pages/ProfesorRoutines';
 import RecepcionDashboard from './pages/RecepcionDashboard';
 import AlumnoDashboard from './pages/AlumnoDashboard';
 import Unauthorized from './pages/Unauthorized';
@@ -31,6 +33,8 @@ function App() {
 
           <Route element={<ProtectedRoute allowedRoles={[ROLES.PROFESOR, ROLES.ADMIN]} />}>
             <Route path="/profesor" element={<ProfesorDashboard />} />
+            <Route path="/profesor/rutinas" element={<ProfesorRoutines />} />
+            <Route path="/profesor/ejercicios" element={<ProfesorExercises />} />
           </Route>
 
           <Route element={<ProtectedRoute allowedRoles={[ROLES.RECEPCIONISTA, ROLES.ADMIN]} />}>
