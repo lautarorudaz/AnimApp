@@ -199,3 +199,991 @@
   .training-editor-footer button svg { display: none; }
   .training-routine-heading h2 { font-size: 1.35rem; }
 }
+
+/* Compact visual system -------------------------------------------------- */
+.training-workspace {
+  --training-soft: rgba(123,185,242,.08);
+  background:
+    radial-gradient(circle at 92% 0%, rgba(46,113,179,.10), transparent 28rem),
+    var(--bg-primary);
+}
+
+.training-workspace .main-content {
+  width: 100%;
+  max-width: none;
+}
+
+.training-workspace h1 {
+  font-size: clamp(1.45rem, 2.2vw, 1.9rem);
+}
+
+.training-sidebar-caption {
+  margin: .45rem .55rem 0;
+  font-size: .68rem;
+  letter-spacing: .04em;
+}
+
+.training-logout {
+  margin-top: 1rem;
+}
+
+.training-eyebrow {
+  font-size: .62rem;
+  letter-spacing: .16em;
+}
+
+.training-muted,
+.training-footnote {
+  font-size: .8rem;
+}
+
+.training-card {
+  background: linear-gradient(145deg, rgba(16,42,71,.94), rgba(11,29,51,.96));
+  border-color: rgba(151,190,228,.13);
+  border-radius: 14px;
+  padding: 1rem;
+  box-shadow: 0 10px 28px rgba(0,0,0,.12);
+}
+
+.training-stats {
+  gap: .7rem;
+  margin-bottom: 1rem;
+}
+
+.training-stats section {
+  min-height: 82px;
+  padding: .85rem 1rem;
+  align-content: center;
+}
+
+.training-stats strong {
+  font-size: 1.48rem;
+}
+
+.training-stats span {
+  font-size: .72rem;
+}
+
+.training-toolbar {
+  gap: .7rem;
+  margin-bottom: .85rem;
+  padding: .75rem;
+  border: 1px solid var(--border-color);
+  border-radius: 12px;
+  background: rgba(11,29,51,.66);
+}
+
+.training-field {
+  gap: .3rem;
+  margin-bottom: .75rem;
+  font-size: .72rem;
+}
+
+.training-field > label {
+  letter-spacing: .02em;
+}
+
+.training-field .form-input {
+  min-height: 36px;
+}
+
+.training-search svg {
+  left: .72rem;
+  width: 15px;
+}
+
+.training-search .form-input {
+  padding-left: 2.1rem;
+}
+
+.training-badge {
+  padding: .22rem .56rem;
+  font-size: .65rem;
+}
+
+.training-notice {
+  padding: .7rem .82rem;
+  border-radius: 10px;
+  margin-bottom: .75rem;
+  font-size: .78rem;
+}
+
+.training-empty {
+  padding: 2rem 1rem;
+  border-radius: 14px;
+}
+
+.training-empty svg {
+  width: 25px;
+  margin-bottom: .55rem;
+}
+
+.training-empty p {
+  font-size: .8rem;
+}
+
+.training-student-row {
+  grid-template-columns: minmax(210px,.9fr) minmax(170px,.75fr) minmax(310px,1.2fr);
+  gap: 1rem;
+  padding: .85rem 1rem;
+}
+
+.student-row-identity .training-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  font-size: .78rem;
+}
+
+.student-row-name h2 {
+  font-size: .92rem;
+}
+
+.student-row-plan {
+  padding-left: 1rem;
+}
+
+.training-student-row .training-student-actions button {
+  min-height: 32px;
+  padding: .48rem .65rem;
+  font-size: .68rem;
+}
+
+.training-overlay {
+  padding: 1rem;
+  background: rgba(2,8,18,.88);
+}
+
+.training-modal {
+  max-width: 520px;
+  padding: 1.15rem;
+  border-radius: 16px;
+  box-shadow: 0 32px 90px rgba(0,0,0,.58);
+}
+
+.training-modal-wide {
+  max-width: 1180px;
+}
+
+.training-modal-header {
+  padding-bottom: .75rem;
+  margin-bottom: .85rem;
+}
+
+.training-modal-header h2 {
+  font-size: 1.05rem;
+}
+
+.training-icon {
+  min-width: 32px;
+  min-height: 32px;
+  border-radius: 9px;
+  padding: .38rem;
+}
+
+.training-modal-actions {
+  margin-top: 1rem;
+}
+
+.training-form-grid {
+  gap: .75rem;
+}
+
+.training-editor-intro {
+  margin-bottom: .75rem;
+}
+
+.training-section-label {
+  margin: .55rem 0;
+}
+
+.training-section-label h3 {
+  font-size: .9rem;
+}
+
+.training-tabs {
+  gap: .35rem;
+  margin: .35rem 0 .7rem;
+  padding: .28rem;
+  border: 1px solid rgba(151,190,228,.12);
+  border-radius: 11px;
+  background: rgba(4,15,29,.45);
+  scrollbar-width: thin;
+}
+
+.training-tabs button {
+  border: 0;
+  border-radius: 8px;
+  padding: .52rem .78rem;
+  font-size: .76rem;
+}
+
+.training-tabs button.is-selected {
+  background: linear-gradient(135deg, rgba(87,158,224,.26), rgba(35,98,161,.24));
+  box-shadow: inset 0 0 0 1px rgba(123,185,242,.42);
+}
+
+.training-days {
+  width: fit-content;
+  max-width: 100%;
+  border-radius: 999px;
+}
+
+.training-days button {
+  padding: .46rem .75rem;
+  font-size: .7rem;
+}
+
+.training-week-editor {
+  margin-top: .55rem;
+  padding: .85rem;
+  border: 1px solid rgba(151,190,228,.12);
+  border-radius: 14px;
+  background: rgba(7,20,38,.36);
+}
+
+.training-editor-row {
+  margin-bottom: .7rem;
+  gap: .45rem;
+}
+
+.training-editor-row button {
+  margin-bottom: .08rem;
+}
+
+.training-stage-editor {
+  position: relative;
+  margin-bottom: .7rem;
+  padding: .75rem;
+  overflow: hidden;
+  background: rgba(11,29,51,.76);
+  border-color: rgba(123,185,242,.17);
+  box-shadow: none;
+}
+
+.training-stage-editor::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 3px;
+  background: linear-gradient(180deg, var(--brand-100), rgba(87,158,224,.08));
+}
+
+.training-stage-title {
+  gap: .62rem;
+  margin-bottom: .7rem;
+}
+
+.training-stage-number {
+  width: 31px;
+  height: 31px;
+  border-radius: 9px;
+  font-size: .68rem;
+}
+
+.training-stage-title h3 {
+  font-size: .88rem;
+}
+
+.training-stage-title p {
+  font-size: .68rem;
+}
+
+.training-stage-count {
+  display: inline-flex;
+  align-items: center;
+  margin-left: .15rem;
+  padding: .16rem .45rem;
+  border-radius: 999px;
+  background: rgba(123,185,242,.08);
+  color: var(--brand-100);
+  font-size: .61rem;
+  white-space: nowrap;
+}
+
+.training-stage-empty {
+  margin-top: .5rem;
+  padding: .8rem;
+  border: 1px dashed rgba(123,185,242,.22);
+  border-radius: 10px;
+  background: rgba(7,20,38,.32);
+  text-align: center;
+  font-size: .74rem;
+}
+
+.training-exercise-editor {
+  position: relative;
+  margin-top: .55rem;
+  padding: .72rem .75rem .75rem .9rem;
+  border-radius: 11px;
+  background: rgba(7,20,38,.76);
+  border-color: rgba(151,190,228,.13);
+}
+
+.training-exercise-editor::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: .75rem;
+  bottom: .75rem;
+  width: 2px;
+  background: rgba(123,185,242,.55);
+}
+
+.training-exercise-editor > .training-section-label {
+  margin: 0 0 .55rem;
+}
+
+.training-exercise-editor h4 {
+  display: flex;
+  align-items: center;
+  gap: .5rem;
+  font-size: .83rem;
+}
+
+.training-exercise-index {
+  display: inline-grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border: 1px solid rgba(123,185,242,.26);
+  border-radius: 7px;
+  background: var(--training-soft);
+  color: var(--brand-100);
+  font-size: .65rem;
+}
+
+.training-exercise-fields {
+  grid-template-columns: .7fr 1.15fr 1fr 1fr;
+  gap: .45rem;
+}
+
+.training-prescription-field {
+  gap: .12rem;
+  margin: 0;
+  padding: .42rem .52rem;
+  border: 1px solid rgba(151,190,228,.12);
+  border-radius: 9px;
+  background: rgba(16,42,71,.45);
+  transition: var(--transition-fast);
+}
+
+.training-prescription-field:focus-within {
+  border-color: var(--brand-200);
+  box-shadow: 0 0 0 2px rgba(87,158,224,.12);
+}
+
+.training-prescription-field > label {
+  color: #89a6c2;
+  font-size: .59rem;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+
+.training-prescription-field .form-input {
+  min-height: 25px;
+  padding: .12rem 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  font-size: .79rem;
+  box-shadow: none;
+}
+
+.training-exercise-notes {
+  margin: .5rem 0 0 !important;
+}
+
+.training-exercise-notes textarea {
+  min-height: 50px !important;
+  background: rgba(16,42,71,.35) !important;
+}
+
+.training-library {
+  padding: .75rem;
+  margin: .65rem 0;
+  border-radius: 11px;
+  box-shadow: inset 0 0 0 1px rgba(123,185,242,.04);
+}
+
+.training-library h4 {
+  margin-bottom: .55rem;
+  font-size: .85rem;
+}
+
+.training-library-results {
+  max-height: 240px;
+}
+
+.training-library-results > button {
+  padding: .6rem .45rem;
+  font-size: .78rem;
+}
+
+.training-editor-footer {
+  bottom: -1.15rem;
+  margin: .8rem -1.15rem -1.15rem;
+  padding: .75rem 1.15rem;
+  border-radius: 0 0 16px 16px;
+  background: rgba(11,29,51,.96);
+  backdrop-filter: blur(14px);
+}
+
+.training-editor-footer > div:first-child {
+  font-size: .66rem;
+}
+
+.training-routine-heading {
+  margin-bottom: .75rem;
+  padding: 1rem 1.1rem;
+  background:
+    linear-gradient(120deg, rgba(16,42,71,.97), rgba(11,29,51,.96)),
+    var(--bg-card);
+}
+
+.training-routine-heading h2 {
+  margin: .18rem 0;
+  font-size: 1.35rem;
+}
+
+.training-routine-heading > p {
+  font-size: .82rem;
+}
+
+.training-chips {
+  gap: .35rem;
+  margin-top: .65rem;
+}
+
+.training-chips span {
+  padding: .25rem .55rem;
+  font-size: .67rem;
+}
+
+.training-stages {
+  gap: .7rem;
+  margin-top: .7rem;
+}
+
+.routine-viewer .training-stages > .training-card {
+  padding: .8rem;
+  box-shadow: none;
+}
+
+.routine-viewer .training-stage-title {
+  margin-bottom: .55rem;
+}
+
+.training-exercise-list {
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 260px), 1fr));
+  gap: .5rem;
+}
+
+.training-exercise-view {
+  position: relative;
+  padding: .75rem .8rem .75rem .95rem;
+  border-radius: 10px;
+  background: rgba(7,20,38,.72);
+}
+
+.training-exercise-view::before {
+  content: '';
+  position: absolute;
+  inset: .75rem auto .75rem 0;
+  width: 2px;
+  background: rgba(123,185,242,.48);
+}
+
+.training-exercise-view h4 {
+  display: flex;
+  align-items: center;
+  gap: .42rem;
+  margin-bottom: .55rem;
+  font-size: .82rem;
+}
+
+.training-prescription {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: .45rem;
+}
+
+.training-prescription > div {
+  padding: .35rem .45rem;
+  border-radius: 7px;
+  background: rgba(16,42,71,.38);
+}
+
+.training-prescription dt {
+  font-size: .58rem;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+
+.training-prescription dd {
+  font-size: .78rem;
+}
+
+.training-note {
+  margin-top: .55rem;
+  font-size: .74rem;
+}
+
+.training-publication {
+  margin: .65rem 0;
+  font-size: .72rem;
+}
+
+.exercise-grid,
+.generic-routine-grid {
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 250px), 1fr));
+  gap: .8rem;
+}
+
+.exercise-art {
+  aspect-ratio: 16 / 6.5;
+}
+
+.exercise-card-body {
+  padding: .85rem;
+}
+
+.exercise-card h2,
+.generic-routine-card h2 {
+  margin: .5rem 0 .25rem;
+  font-size: .96rem;
+}
+
+.generic-routine-secondary {
+  margin-top: .75rem;
+}
+
+.training-results-count {
+  margin: -.15rem 0 .8rem;
+}
+
+@media (max-width: 900px) {
+  .training-workspace .sidebar {
+    width: 100%;
+    height: auto;
+    position: static;
+    padding: .75rem;
+  }
+
+  .training-workspace .sidebar > div:first-child {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: center;
+    gap: .2rem .8rem;
+  }
+
+  .training-workspace .sidebar .logo {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .training-sidebar-caption {
+    display: none;
+  }
+
+  .training-workspace .sidebar-menu {
+    grid-column: 2;
+    grid-row: 1;
+    justify-content: flex-end;
+    margin: 0;
+    flex-wrap: wrap;
+  }
+
+  .training-workspace .training-logout {
+    display: inline-flex;
+    align-self: flex-start;
+    margin-top: .45rem;
+  }
+
+  .training-student-row {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 680px) {
+  .training-workspace .sidebar > div:first-child {
+    display: block;
+  }
+
+  .training-workspace .sidebar-menu {
+    justify-content: flex-start;
+    margin-top: .65rem;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    padding-bottom: .15rem;
+  }
+
+  .training-workspace .sidebar-item {
+    flex-shrink: 0;
+    font-size: .72rem;
+    padding: .5rem .6rem;
+  }
+
+  .training-workspace .main-content {
+    padding: .85rem;
+  }
+
+  .training-workspace .header-bar {
+    align-items: flex-start;
+    margin-bottom: .85rem;
+  }
+
+  .training-stats {
+    grid-template-columns: repeat(3, minmax(0,1fr));
+  }
+
+  .training-stats section {
+    min-height: 68px;
+    padding: .65rem;
+  }
+
+  .training-toolbar {
+    padding: .65rem;
+  }
+
+  .training-student-row {
+    padding: .8rem;
+  }
+
+  .training-overlay {
+    padding: .35rem;
+  }
+
+  .training-modal {
+    padding: .85rem;
+    border-radius: 13px;
+  }
+
+  .training-week-editor {
+    margin-inline: -.2rem;
+    padding: .6rem;
+  }
+
+  .training-stage-editor {
+    padding: .65rem;
+  }
+
+  .training-exercise-fields {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .training-editor-footer {
+    bottom: -.85rem;
+    margin: .7rem -.85rem -.85rem;
+    padding: .65rem .75rem;
+  }
+
+  .training-editor-footer > div:first-child {
+    width: 100%;
+  }
+
+  .training-editor-footer .training-actions {
+    grid-template-columns: .7fr 1fr 1fr;
+  }
+}
+
+@media (max-width: 420px) {
+  .training-stats span {
+    line-height: 1.25;
+  }
+
+  .training-stage-editor > .training-section-label {
+    align-items: flex-start;
+  }
+
+  .training-stage-editor > .training-section-label .btn-secondary {
+    padding-inline: .65rem;
+  }
+
+  .training-exercise-editor {
+    padding-right: .58rem;
+  }
+
+  .training-exercise-editor > .training-section-label {
+    align-items: flex-start;
+  }
+
+  .training-exercise-editor .training-actions {
+    gap: .28rem;
+  }
+
+  .training-exercise-editor .training-icon {
+    min-width: 30px;
+    min-height: 30px;
+  }
+}
+
+/* Focused routine editor modal ------------------------------------------ */
+.training-modal-editor {
+  width: min(94vw, 960px);
+  max-width: 960px;
+  height: min(84dvh, 720px);
+  max-height: calc(100dvh - 2rem);
+  margin: auto;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: #0b1d33;
+  border-color: rgba(123,185,242,.32);
+  box-shadow: 0 28px 90px rgba(0,0,0,.62), 0 0 0 1px rgba(123,185,242,.04);
+}
+
+.training-modal-editor .training-modal-header {
+  flex: 0 0 auto;
+  min-height: 52px;
+  margin: 0;
+  padding: .7rem .85rem .7rem 1rem;
+  background: linear-gradient(90deg, rgba(16,42,71,.98), rgba(11,29,51,.98));
+}
+
+.training-modal-editor .training-modal-header h2 {
+  font-size: .98rem;
+}
+
+.training-modal-editor .training-editor-intro {
+  flex: 0 0 auto;
+  margin: 0;
+  padding: .58rem 1rem;
+  border-bottom: 1px solid rgba(151,190,228,.12);
+  background: rgba(7,20,38,.56);
+}
+
+.training-editor-state {
+  display: flex;
+  align-items: center;
+  gap: .55rem;
+  color: var(--text-muted);
+  font-size: .66rem;
+}
+
+.training-modal-editor > .training-notice {
+  flex: 0 0 auto;
+  margin: .55rem 1rem 0;
+  padding: .55rem .7rem;
+}
+
+.training-modal-editor > .training-fieldset {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: .75rem 1rem 1rem;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(123,185,242,.42) transparent;
+}
+
+.training-modal-editor > .training-fieldset::-webkit-scrollbar {
+  width: 8px;
+}
+
+.training-modal-editor > .training-fieldset::-webkit-scrollbar-thumb {
+  border: 2px solid #0b1d33;
+  border-radius: 999px;
+  background: rgba(123,185,242,.38);
+}
+
+.training-plan-details {
+  padding: .78rem .85rem .05rem;
+  border: 1px solid rgba(151,190,228,.12);
+  border-radius: 12px;
+  background: rgba(7,20,38,.40);
+}
+
+.training-panel-heading,
+.training-schedule-heading > div {
+  min-width: 0;
+}
+
+.training-panel-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 1rem;
+  margin-bottom: .62rem;
+  padding-bottom: .55rem;
+  border-bottom: 1px solid rgba(151,190,228,.10);
+}
+
+.training-panel-heading h3,
+.training-schedule-heading h3 {
+  margin-top: .06rem;
+  font-size: .88rem;
+}
+
+.training-panel-heading p {
+  color: var(--text-muted);
+  font-size: .68rem;
+}
+
+.training-plan-details .training-field {
+  margin-bottom: .58rem;
+}
+
+.training-plan-details textarea {
+  min-height: 46px;
+}
+
+.training-plan-details .training-sharing {
+  margin-bottom: .65rem;
+  padding: .65rem .75rem;
+}
+
+.training-schedule-builder {
+  margin-top: .75rem;
+}
+
+.training-schedule-heading {
+  margin: 0 0 .4rem;
+}
+
+.training-schedule-builder > .training-tabs {
+  margin-bottom: .5rem;
+}
+
+.training-modal-editor .training-week-editor {
+  margin-top: 0;
+  padding: .7rem;
+  background: rgba(7,20,38,.28);
+}
+
+.training-modal-editor .training-week-editor > .training-editor-row {
+  margin-bottom: .45rem;
+  padding-bottom: .55rem;
+  border-bottom: 1px solid rgba(151,190,228,.10);
+}
+
+.training-modal-editor .training-week-editor > .training-section-label {
+  margin: .25rem 0;
+}
+
+.training-modal-editor .training-days {
+  margin-bottom: .48rem;
+}
+
+.training-modal-editor .training-stage-editor {
+  margin-bottom: .5rem;
+  padding: .62rem .68rem;
+  border-radius: 10px;
+  background: rgba(11,29,51,.68);
+}
+
+.training-modal-editor .training-stage-editor > .training-section-label {
+  margin: 0;
+}
+
+.training-modal-editor .training-stage-title {
+  margin-bottom: 0;
+}
+
+.training-modal-editor .training-stage-number {
+  width: 28px;
+  height: 28px;
+}
+
+.training-modal-editor .training-stage-title h3 {
+  font-size: .82rem;
+}
+
+.training-modal-editor .training-stage-title p {
+  font-size: .63rem;
+}
+
+.training-modal-editor .training-stage-empty {
+  margin-top: .45rem;
+  padding: .62rem;
+}
+
+.training-modal-editor .training-exercise-editor {
+  margin-top: .45rem;
+  padding-block: .6rem;
+}
+
+.training-modal-editor .training-library {
+  margin: .5rem 0;
+}
+
+.training-modal-editor .training-editor-footer {
+  position: relative;
+  inset: auto;
+  z-index: 2;
+  flex: 0 0 auto;
+  min-height: 58px;
+  margin: 0;
+  padding: .62rem 1rem;
+  border-radius: 0;
+  background: rgba(8,24,43,.98);
+  box-shadow: 0 -12px 28px rgba(0,0,0,.16);
+}
+
+.training-modal-editor .training-editor-footer .btn-primary,
+.training-modal-editor .training-editor-footer .btn-secondary {
+  min-height: 34px;
+  padding: .5rem .72rem;
+}
+
+@media (max-width: 680px) {
+  .training-modal-editor {
+    width: 100%;
+    height: calc(100dvh - .7rem);
+    max-height: calc(100dvh - .7rem);
+    border-radius: 13px;
+  }
+
+  .training-modal-editor .training-modal-header {
+    min-height: 48px;
+    padding: .6rem .7rem .6rem .8rem;
+  }
+
+  .training-modal-editor .training-editor-intro {
+    padding: .5rem .75rem;
+  }
+
+  .training-editor-state > span:last-child {
+    display: none;
+  }
+
+  .training-modal-editor > .training-notice {
+    margin: .45rem .75rem 0;
+  }
+
+  .training-modal-editor > .training-fieldset {
+    padding: .65rem .7rem .8rem;
+  }
+
+  .training-plan-details {
+    padding: .65rem .65rem .05rem;
+  }
+
+  .training-panel-heading {
+    align-items: flex-start;
+  }
+
+  .training-panel-heading p {
+    display: none;
+  }
+
+  .training-modal-editor .training-week-editor {
+    margin-inline: 0;
+    padding: .55rem;
+  }
+
+  .training-modal-editor .training-editor-footer {
+    min-height: auto;
+    padding: .55rem .65rem;
+  }
+
+  .training-modal-editor .training-editor-footer > div:first-child {
+    display: none;
+  }
+
+  .training-modal-editor .training-editor-footer .training-actions {
+    width: 100%;
+    grid-template-columns: .72fr 1fr 1fr;
+  }
+}

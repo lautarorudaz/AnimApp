@@ -255,7 +255,7 @@ const RecepcionDashboard = () => {
     <div className="dashboard-layout">
       <aside className="sidebar">
         <div>
-          <div className="logo" style={{ marginBottom: '2rem' }}>
+          <div className="logo" style={{ marginBottom: '1.25rem' }}>
             <div className="logo-icon" style={{ background: 'linear-gradient(135deg, var(--accent-cyan), #0284c7)' }}>
               <UserCheck size={20} />
             </div>
@@ -283,7 +283,7 @@ const RecepcionDashboard = () => {
       <main className="main-content">
         <div className="header-bar">
           <div>
-            <h1 style={{ fontSize: '1.8rem' }}>{activeSection === 'alumnos' ? 'Gestion de alumnos' : 'Stock de limpieza'}</h1>
+            <h1>{activeSection === 'alumnos' ? 'Gestion de alumnos' : 'Stock de limpieza'}</h1>
             <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem' }}>
               Trabajo actual en {activeSede?.titulo || 'sede asignada'}.
             </p>
@@ -308,7 +308,7 @@ const RecepcionDashboard = () => {
           <>
             <Notice error>{studentsError}</Notice><Notice>{studentNotice}</Notice>
             {studentsLoading && <p role="status">Cargando alumnos…</p>}
-            <div style={{ marginBottom: '1.5rem', position: 'relative', maxWidth: '420px' }}>
+            <div className="dashboard-search">
               <Search size={18} style={{ position: 'absolute', left: '1rem', top: '50%', transform: 'translateY(-50%)', color: 'var(--text-muted)' }} />
               <input
                 type="text"
@@ -320,8 +320,8 @@ const RecepcionDashboard = () => {
               />
             </div>
 
-            <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-              <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+            <div className="dashboard-table-shell" style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+              <table className="dashboard-data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                 <thead>
                   <tr style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                     <th style={{ padding: '1rem 1.5rem' }}>Alumno / DNI</th>
@@ -400,8 +400,8 @@ const RecepcionDashboard = () => {
             </div>
 
             <div className="stock-workspace">
-              <div style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
-                <table style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
+              <div className="dashboard-table-shell" style={{ background: 'var(--bg-card)', borderRadius: 'var(--radius-md)', border: '1px solid var(--border-color)', overflow: 'hidden' }}>
+                <table className="dashboard-data-table" style={{ width: '100%', borderCollapse: 'collapse', textAlign: 'left' }}>
                   <thead>
                     <tr style={{ background: 'rgba(0,0,0,0.2)', borderBottom: '1px solid var(--border-color)', color: 'var(--text-muted)', fontSize: '0.85rem' }}>
                       <th style={{ padding: '1rem 1.5rem' }}>Producto</th>
@@ -516,8 +516,8 @@ const RecepcionDashboard = () => {
         )}
 
         {showProductModal && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
-            <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '520px', border: '1px solid var(--border-color)' }}>
+          <div className="legacy-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
+            <div className="legacy-modal-panel" style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '520px', border: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h2>{editingProduct ? 'Editar producto' : 'Nuevo producto'}</h2>
                 <button onClick={() => setShowProductModal(false)} style={{ background: 'none', color: 'var(--text-muted)' }}>
@@ -563,8 +563,8 @@ const RecepcionDashboard = () => {
         )}
 
         {showMovementModal && selectedProduct && (
-          <div style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
-            <div style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '500px', border: '1px solid var(--border-color)' }}>
+          <div className="legacy-modal-overlay" style={{ position: 'fixed', top: 0, left: 0, width: '100%', height: '100%', background: 'rgba(0,0,0,0.8)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 2000, padding: '1rem' }}>
+            <div className="legacy-modal-panel" style={{ background: 'var(--bg-card)', padding: '2.5rem', borderRadius: 'var(--radius-lg)', width: '100%', maxWidth: '500px', border: '1px solid var(--border-color)' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '1.5rem' }}>
                 <h2>{movementForm.tipo === 'ingreso' ? 'Ingreso' : 'Egreso'} de stock</h2>
                 <button onClick={() => setShowMovementModal(false)} style={{ background: 'none', color: 'var(--text-muted)' }}>

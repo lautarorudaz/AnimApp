@@ -25,7 +25,7 @@ export function Workspace({ children, student = false, admin = false }) {
   </div>;
 }
 
-export function Modal({ title, onClose, children, wide = false, busy = false }) {
+export function Modal({ title, onClose, children, wide = false, editor = false, busy = false }) {
   const panel = useRef(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -47,7 +47,7 @@ export function Modal({ title, onClose, children, wide = false, busy = false }) 
     document.addEventListener('keydown', handleKey);
     return () => { document.body.style.overflow = oldOverflow; document.removeEventListener('keydown', handleKey); previous?.focus(); };
   }, [busy]);
-  return <div className="training-overlay"><section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`training-modal ${wide ? 'training-modal-wide' : ''}`}>
+  return <div className="training-overlay"><section ref={panel} tabIndex={-1} role="dialog" aria-modal="true" aria-labelledby={titleId} className={`training-modal ${wide ? 'training-modal-wide' : ''} ${editor ? 'training-modal-editor' : ''}`}>
     <header className="training-modal-header"><h2 id={titleId}>{title}</h2><button type="button" className="training-icon" aria-label="Cerrar ventana" disabled={busy} onClick={onClose}><X size={21} /></button></header>
     {children}
   </section></div>;

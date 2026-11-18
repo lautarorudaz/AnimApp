@@ -4,8 +4,8 @@ import { SEDES } from '../constants/appData';
 
 const Footer = () => {
   return (
-    <footer id="contacto" style={{ background: '#070a12', padding: '4rem 0 2rem', borderTop: '1px solid var(--border-color)' }}>
-      <div className="container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '3rem', marginBottom: '3rem' }}>
+    <footer id="contacto" style={{ background: '#070a12', padding: '3rem 0 1.5rem', borderTop: '1px solid var(--border-color)' }}>
+      <div className="container" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(250px, 1fr))', gap: '2rem', marginBottom: '2rem' }}>
         <div>
           <div className="logo" style={{ marginBottom: '1.2rem' }}>
             <div className="logo-icon">
