@@ -7,6 +7,7 @@ import heroLeft from '../assets/gym-hero-left.png';
 import heroRight from '../assets/gym-hero-right.png';
 import { SEDES } from '../constants/appData';
 import { getSedeWhatsappUrl, SEDE_INFO } from '../constants/sedeInfo';
+import GymAssistant from '../features/ai/GymAssistant';
 
 const Landing = () => {
   const [selectedSede, setSelectedSede] = useState(null);
@@ -166,6 +167,7 @@ const Landing = () => {
                     <div className="sede-services" aria-label="Servicios principales">
                       {info.servicios.map((service) => <span key={service}>{service}</span>)}
                     </div>
+                    {info.equipoReal && <div className="sede-card-hours"><Clock3 size={15} /><div>{info.horarios.map((horario) => <span key={horario}>{horario}</span>)}</div></div>}
                     <div className="sede-card-footer">
                       <span><MapPin size={15} />{sede.direccion}</span>
                       <strong>Conocer la sede <ArrowRight size={16} /></strong>
@@ -217,7 +219,7 @@ const Landing = () => {
                   <div>
                     <span>Personal de la sede</span>
                     <h3 id="sede-staff-title">Conocé al equipo</h3>
-                    <p>Perfiles representativos. Los nombres y cronogramas reales se pueden cargar desde este mismo bloque.</p>
+                    <p>{selectedInfo.equipoReal ? 'Conocé a quienes te acompañan en esta sede y consultá sus horarios de atención.' : 'Perfiles representativos. Los nombres y cronogramas reales se pueden cargar desde este mismo bloque.'}</p>
                   </div>
                   <div className="sede-staff-controls">
                     <span aria-live="polite">{staffIndex + 1} / {selectedInfo.equipo.length}</span>
@@ -234,13 +236,14 @@ const Landing = () => {
                     {selectedInfo.equipo.map((member, index) => (
                       <article className="sede-staff-slide" key={member.nombre} aria-hidden={index !== staffIndex}>
                         <div className="sede-staff-photo">
-                          <img src={member.foto} alt={member.fotoAlt} loading="lazy" />
-                          <span>Perfil representativo</span>
+                          {member.foto ? <img src={member.foto} alt={member.fotoAlt} loading="lazy" /> : <div className="sede-staff-photo-pending" role="img" aria-label={`Foto de ${member.nombre} pendiente`}><Users size={44} strokeWidth={1.25} /><strong>{member.nombre}</strong></div>}
+                          <span>{selectedInfo.equipoReal ? member.foto ? 'Equipo de la sede' : 'Foto pendiente' : 'Perfil representativo'}</span>
                         </div>
                         <div className="sede-staff-info">
                           <span className="sede-staff-eyebrow">Equipo AnimApp</span>
                           <h4>{member.nombre}</h4>
                           <p>{member.especialidad}</p>
+                          {member.otraSede && <p className="sede-staff-other-branch"><MapPin size={14} />También en sede {member.otraSede}</p>}
                           <div className="sede-staff-schedule">
                             <Clock3 size={18} />
                             <div>
@@ -299,6 +302,7 @@ const Landing = () => {
       </section>
 
       <Footer />
+      <GymAssistant />
     </div>
   );
 };

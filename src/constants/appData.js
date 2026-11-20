@@ -24,14 +24,14 @@ export const SEDES = [
     id: 'moreno',
     nombre: 'Moreno',
     titulo: 'Sede Moreno',
-    direccion: 'Moreno',
+    direccion: 'Avenida Moreno 1020',
     color: 'var(--accent-orange)'
   },
   {
     id: 'edison',
     nombre: 'Edison',
     titulo: 'Sede Edison',
-    direccion: 'Edison',
+    direccion: 'Avenida Edison 76',
     color: 'var(--accent-cyan)'
   },
   {

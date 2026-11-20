@@ -8,7 +8,7 @@
     "build": "vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "test": "node --test tests/routines.test.mjs",
+    "test": "node --test tests/routines.test.mjs tests/ai.test.mjs",
     "test:rules": "firebase emulators:exec --only firestore --project demo-animapp \"node --test tests/firestore.rules.test.mjs\"",
     "test:e2e": "firebase emulators:exec --only auth,firestore --project demo-animapp \"playwright test\"",
     "test:integration": "firebase emulators:exec --only auth,firestore --project demo-animapp \"node tests/integration.mjs\""

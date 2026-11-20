@@ -101,6 +101,38 @@ Para usar manualmente emuladores, iniciar `firebase emulators:start --only auth,
 
 ## Alcance
 
+### Asistente informativo con Firebase AI Logic
+
+La landing incluye un chat flotante con Gemini Developer API mediante `firebase/ai`. La implementación usa el proyecto Firebase existente, sin Cloud Functions ni servidor propio. No se cambia el plan de facturación desde el código. Para usar el nivel gratuito, el proyecto debe seguir en Spark, sin una cuenta de facturación vinculada, y respetar las cuotas del modelo elegido.
+
+Configuración en `.env.local` (la clave de sitio es pública; no es la clave secreta de Gemini):
+
+```dotenv
+VITE_FIREBASE_APPCHECK_SITE_KEY=CLAVE_PUBLICA_DEL_SITIO
+# Opcional; el valor predeterminado es gemini-3.5-flash-lite
+VITE_GEMINI_MODEL=gemini-3.5-flash-lite
+```
+
+El modelo predeterminado figura con entrada y salida gratuitas en la tarifa Standard revisada el 20/11/2026. Verificar disponibilidad y cuotas del proyecto antes de cambiarlo. Referencias: [precios de Gemini](https://ai.google.dev/gemini-api/docs/pricing), [Firebase AI Logic](https://firebase.google.com/docs/ai-logic/get-started).
+
+App Check se inicializa antes de Auth y Firestore cuando hay una clave de sitio. En desarrollo, exclusivamente en `localhost`, `127.0.0.1` o `[::1]`, usa el proveedor de depuración. En producción usa `ReCaptchaEnterpriseProvider`. El cliente de AI Logic solicita tokens de uso limitado. Las pruebas con emuladores omiten App Check y nunca deben llamar al modelo real.
+
+Para completar la verificación local:
+
+1. Habilitar Gemini Developer API dentro de Firebase AI Logic y registrar la aplicación web en App Check.
+2. Guardar la clave pública del sitio en `.env.local` y reiniciar Vite si es necesario.
+3. Abrir la aplicación en el navegador de uso habitual, abrir la consola con F12, recargar y buscar `App Check debug token`.
+4. Copiar ese token privado directamente a Firebase → App Check → Aplicaciones → AnimApp → menú de tres puntos → Administrar tokens de depuración.
+5. Recargar la aplicación y enviar una consulta desde el chat.
+
+Cada navegador o computadora puede generar su propio token. No guardarlo en Git, en variables `VITE_*` ni compartirlo en capturas. Para un sitio publicado se autorizan sus dominios reales en reCAPTCHA; no se registra localhost como dominio de producción. Ver [proveedor de depuración](https://firebase.google.com/docs/app-check/web/debug-provider) y [protección de AI Logic](https://firebase.google.com/docs/ai-logic/app-check).
+
+El asistente recibe solo una selección de los datos públicos de `SEDES` y `SEDE_INFO`: direcciones confirmadas, horarios, profesores y contactos. Omite imágenes y perfiles de ejemplo de GSM. Usa instrucciones para informar datos pendientes, limitar el tema a AnimApp y orientar a recepción; esas instrucciones no garantizan la exactitud de cada respuesta. No consulta Firestore ni accede a cuentas o rutinas privadas. Los mensajes quedan en memoria del componente y no se guardan en Firestore ni localStorage. Al enviar, Google procesa el contenido según las condiciones del nivel gratuito.
+
+No hay solicitudes de generación automáticas al abrir el chat. La UI admite 600 caracteres por mensaje y envía hasta ocho mensajes anteriores; la salida se limita a 512 tokens. Hay una espera de seis segundos y un máximo local de 20 intentos por hora mientras la página permanece abierta, sin reintentos automáticos. Estos controles son de experiencia de usuario, se reinician al recargar y **no sustituyen las cuotas ni la protección del proveedor**.
+
+Validación: `npm test` incluye pruebas de contexto público, historial y errores. `npx playwright test tests/e2e/assistant.spec.mjs` verifica la UI con el transporte de IA simulado, sin consumir cuota real. Eso no acredita una respuesta real de Gemini; la prueba real queda pendiente hasta registrar el token del navegador y enviar la primera consulta.
+
 Recepción guarda las fichas de alumnos en Firestore y permite seleccionar profesores activos de la sede actual, editar asignaciones y dar de baja. Las fichas nuevas quedan pendientes de cuenta de acceso (`userId: ""`); el administrador puede crear la cuenta con el mismo correo y sede, o vincular una cuenta existente. Se reutiliza la ficha pendiente conservando su asignación y datos. El stock de recepción conserva el prototipo previo con datos en memoria.
 
 La lista de profesores consulta `users` por `rol`, `activo` y `sedeIds`. Los profesores creados por administración incluyen tanto `sedes` como `sedeIds`. La aplicación valida que el profesor esté activo y pertenezca a la sede al guardar; las reglas locales también rechazan asignaciones a otra sede. Recepción no vincula cuentas de acceso ni cambia `userId` o la sede de una ficha existente.

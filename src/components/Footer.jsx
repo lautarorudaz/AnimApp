@@ -1,6 +1,7 @@
 import React from 'react';
-import { Dumbbell, Mail, MapPin, Phone } from 'lucide-react';
+import { Dumbbell, MapPin, MessageCircle } from 'lucide-react';
 import { SEDES } from '../constants/appData';
+import { getSedeWhatsappUrl, SEDE_INFO } from '../constants/sedeInfo';
 
 const Footer = () => {
   return (
@@ -30,13 +31,10 @@ const Footer = () => {
         </div>
 
         <div>
-          <h4 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '1.2rem' }}>Contacto y soporte</h4>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.5rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Phone size={16} color="var(--accent-orange)" /> +54 11 4000-8000
-          </p>
-          <p style={{ color: 'var(--text-muted)', fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-            <Mail size={16} color="var(--accent-orange)" /> contacto@animapp.com
-          </p>
+          <h4 style={{ color: '#fff', fontSize: '1.1rem', marginBottom: '1.2rem' }}>Consultas por WhatsApp</h4>
+          {SEDES.filter((sede) => SEDE_INFO[sede.id].whatsappUrl).map((sede) => <a key={sede.id} href={getSedeWhatsappUrl(SEDE_INFO[sede.id])} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--text-muted)', fontSize: '0.9rem', marginBottom: '0.65rem', display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+            <MessageCircle size={16} color={sede.color} /> Consultar en {sede.nombre}
+          </a>)}
         </div>
       </div>
 
